@@ -2,6 +2,7 @@ import jade.core.AID;
 
 
 public class Abonnement {
+//just a test
 	private int dateAbonnement;
 	private double quantite;
 	private int dateDernierePaiement;
