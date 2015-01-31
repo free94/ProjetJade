@@ -68,6 +68,31 @@ public class AgentTransportPrincipal extends Agent {
 				+ " est terminé.");
 	}
 
+	//comportement lors de la demande du tarif au kwh : plus de notion de devis
+	private class ServiceDemandeTarif extends CyclicBehaviour {
+		@Override
+		public void action() {
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchConversationId("demandeTarif-transporteurPrincipal"), MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
+			ACLMessage msg = myAgent.receive(mt);
+			if (msg != null) {
+				String title = msg.getContent();
+				ACLMessage reply = msg.createReply();
+				try {
+					reply.setPerformative(ACLMessage.PROPOSE);
+					msg.setContentObject(prixTransport);
+					msg.setConversationId("reponseTarif-transporteurPrincipal");
+					myAgent.send(msg);					
+				} catch (IOException e) {
+					System.out.println("Erreur génération du devis");
+				}
+			} 
+			else {
+				block();
+			}
+		}
+	}
+	
 	// comportement du transporteur quand il reçoit une demande d'un fournisseur
 	// (facture)
 	private class ServiceDemandePrix extends CyclicBehaviour {

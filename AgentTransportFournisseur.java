@@ -76,8 +76,9 @@ public class AgentTransportFournisseur extends Agent {
 		@Override
 		public void action() {
 			MessageTemplate mt = MessageTemplate.and(
-					MessageTemplate.MatchPerformative(ACLMessage.REQUEST),
-					MessageTemplate.MatchConversationId("initDisponibilite"));
+					MessageTemplate.MatchConversationId("initDisponibilite"),
+					MessageTemplate.MatchSender(createur)
+					);
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
 				try {

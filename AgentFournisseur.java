@@ -30,43 +30,50 @@ public class AgentFournisseur extends Agent {
 	// private final static int obCA = 1;
 	// private final static int obBenefice = 2;
 
-	// la puissance max d'électricité qu'un fournissuer est capable de fournir
-	// dans une unité de temps
 	private int capaciteProduction = 999;
-	// la capacité utilisé actuellement
-	private int capaciteUtilisee = 0;
-	// prix de production en KWh
-	private static int coutProduction = 1;
-	// prix de vente d'électricité, en KWh
-	private static int prixVente = 10;
-	// unité en milliseconde
-	private static int periodeFacturation = 1000;
-	// liste des abonnements, les AID sont ceux de consommateurs
-	private HashMap<AID, Abonnement> abonnements = new HashMap<AID, Abonnement>();
-	// transporteur tierce potentiellement utilisé
-	private HashMap<AID, Devis> transporteurs = new HashMap<AID, Devis>();
-	// transpoteurs utilisés
-	private ArrayList<AID> transporteursUtilises = new ArrayList<AID>();
-	// l'agent horloge
-	private AID horloge = null;
-	// Factures transporteur
-	private ArrayList<FactureTransporteur> facturesTransport = new ArrayList<FactureTransporteur>();
-	// cout creation de son propre agent de transport
+	
+	private int capaciteUtilisee = 0;// la capacité utilisé actuellement
+	
+	private AID horloge = null;// l'agent horloge
+		
+	//*****************************************LES DONNEES TRANSPORTEURS*****************************************
+	
+	private AID transporteurPrincipal = null;// transporteur tierce potentiellement utilisé
+	
+	private int tarifTransporteurPrincipal = 0;
+	
+	private ArrayList<AID> transporteursUtilises = new ArrayList<AID>();// transporteurs utilisés sur le tour courant
+	
+	private HashMap<AID, Devis> transporteursDisponibles = new HashMap<AID, Devis>();// transporteurs disponibles au début du tour
+	
+	private ArrayList<AID> mesTransporteurs = new ArrayList<AID>();//AID de mes transporteurs (créés) 
+	
 	private static int coutCreationTransporteur = 0;
-	//capacite de transport de son propre agent
-	private int capaciteTransport = 30;
-	//AID de mon transporteur
-	private ArrayList<AID> mesTransporteurs = new ArrayList<AID>(); 
-	// chiffre d'affaire
+	
+	private int capaciteTransport = 30;	//capacite de transport de son propre agent
+	
+	private int tarifTransporteur = 70; //tarif de la location d'une ligne de transport créée par le fournisseur
+			
+	//*****************************************LES DONNEES "COMPTABLES"*****************************************
 	private int CA;
-	// bénéfice (Résultat net avant impôt)
+	
 	private int benefice;
-	//montant d'amande pour une livraison non assurée
-	private static final int amande = 100;
-	//nombre de période estimée pour rendre rentable la création d'un transporteur perso
-	private int nombrePeriodeRentabiliserCreation = 2;
-
-
+	
+	private static final int amande = 100;//montant d'amande pour une livraison non assurée
+	
+	private int nombrePeriodeRentabiliserCreation = 2;//nombre de périodes estimées pour rendre rentable la création d'un transporteur perso
+	
+	private static int coutProduction = 1;
+	
+	private static int prixVente = 10;
+	
+	private static int periodeFacturation = 1000;
+	
+	private HashMap<AID, Abonnement> abonnements = new HashMap<AID, Abonnement>();// liste des abonnements, les AID sont ceux de consommateurs
+	
+	private ArrayList<FactureTransporteur> facturesTransport = new ArrayList<FactureTransporteur>();
+	//-----------------------------------------------------------------------------------------------------------
+	
 	protected void setup() {
 		// Enregistrement du service dans le DF
 		DFAgentDescription dfd = new DFAgentDescription();
@@ -97,20 +104,21 @@ public class AgentFournisseur extends Agent {
 		//Recherche transporteur tierce, on sait qu'il n'y en a qu'un et que cela n'évoluera pas (EDF)
 		template = new DFAgentDescription();
 		sd = new ServiceDescription();
-		sd.setType("Transporteur");
+		sd.setType("TransporteurPrincipal");
 		template.addServices(sd);
-		AID transporteurPrincipal = null;
 		try {
 			result = DFService.search(this, template);
-			transporteurs.put(result[0].getName(), null);
 			transporteurPrincipal = result[0].getName();
 		} catch (FIPAException fe) {
 			fe.printStackTrace();
 		}		
 		
+		//on demande ensuite son tarif au kwh : ce prix n'évoluera pas 
+		addBehaviour(new ServiceDemandePrixFournisseurPrincipal());
 		
 		// abonnener au transporteur principal
-		addBehaviour(new AbonnementTransporteur(transporteurPrincipal));
+		//addBehaviour(new AbonnementTransporteur(transporteurPrincipal));
+		
 		// inscrire l'agent au horloge
 		addBehaviour(new Inscription(horloge, "fournisseur"));
 		// ajouter le comportement principal qui livre electricité et facture
@@ -155,6 +163,33 @@ public class AgentFournisseur extends Agent {
 				+ " est terminé.");
 	}
 	
+	private class ServiceDemandePrixFournisseurPrincipal extends OneShotBehaviour{
+
+		@Override
+		public void action() {
+			// Envoi de la demande de prix a tous les fournisseurs
+			ACLMessage cfp = new ACLMessage(ACLMessage.REQUEST);
+			cfp.addReceiver(transporteurPrincipal);
+			
+			cfp.setContent("demandeTarif");
+			cfp.setConversationId("demandeTarif-transporteurPrincipal");
+			cfp.setReplyWith("request " + System.currentTimeMillis()); // Unique																		// value
+			myAgent.send(cfp);
+			// Preparer le template pour recevoir la réponse
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchConversationId("reponseTarif-transporteurPrincipal"),
+					MessageTemplate.MatchInReplyTo(cfp.getReplyWith()));
+			ACLMessage msg = myAgent.receive(mt);
+			
+			if (msg != null) {
+				tarifTransporteurPrincipal = (Integer) msg.getContentObject();					
+			} 
+			else {
+				block();
+			}	
+		}
+	}
+	
 	// comportement du fournisseur quand il reçoit une demande du consommateur
 	// concernant ses tarifs
 	private class ServiceDemandePrix extends CyclicBehaviour {
@@ -180,10 +215,9 @@ public class AgentFournisseur extends Agent {
 			} else {
 				block();
 			}
-
 		}
-
 	}
+	
 	//comportement quand un consommateur souhaite s'abonner
 	private class ServiceAbonnement extends CyclicBehaviour {
 
@@ -271,7 +305,7 @@ public class AgentFournisseur extends Agent {
 	}
 	
 	//comportement gérant l'intégralité de la gestion des transporteurs : création d'un trnsporteur perso ou non, etc
-	private class ServiceTransport extends OneShotBehaviour{
+	/*private class ServiceTransport extends OneShotBehaviour{
 		private MessageTemplate mt;
 		private double total = 0;
 		
@@ -406,8 +440,61 @@ public class AgentFournisseur extends Agent {
 					}					
 				}
 		}
-	}
+	}*/
 
+	//réception du message "fin de tour pour les consommateurs" de la part de l'agent horloge -> lancement politique de transport
+	private class PolitiqueTransport extends CyclicBehaviour{
+		@Override
+		public void action(){
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchConversationId("finTourPourConsommateurs"),
+					MessageTemplate.MatchSender(horloge));
+			ACLMessage msg = myAgent.receive(mt);
+			if (msg != null) {
+				//on lance l'analyse pour définir notre politique de transport au prochain round
+				int totalAtransporter = 0;
+				//premiere étape : calculer la quantité totale d'électricité probablement à transporter étant donné les derniers chiffres des clients
+				for (Abonnement a : abonnements.values()) {
+					totalAtransporter += a.getQuantite();
+				}
+				transporteursUtilises.clear();
+				//deuxième étape on utilise chaque transporteur perso sans réfléchir à condition qu'on utilise 100% de leur capacité
+				for (AID monTansporteur : mesTransporteurs) {
+					if(capaciteTransport <= totalAtransporter){
+						//on l'indique comme transporteur utilisé
+						transporteursUtilises.add(monTansporteur);
+						initDisponibilite(false, monTansporteur);
+					}
+					else{
+						//calcul de ce qu'il en couterait de passer par un autre transporteur pour ce qu'il reste à transporter
+						int cout = 0;						
+						//Si cela est rentable de laisser disponible le transporteur pour le louer, même en louant nous même de quoi transporter 
+						//ce qu'il reste d'electricité à fournir alors on laisse disponible 
+						if(tarifTransporteur - cout > 0){
+							initDisponibilite(true, monTansporteur);
+						}
+					}					
+				}
+			}
+			else{
+				block();
+			}
+		}
+		private void initDisponibilite(boolean disponibilite, AID monTransporteur){
+			//en fonction de ce qui a été décidé, on indique si le transporteur doit se rendre disponible ou s'il est réservé
+			ACLMessage cfp = new ACLMessage(ACLMessage.REQUEST);
+			cfp.addReceiver(monTransporteur);
+			try {
+				cfp.setContentObject(disponibilite);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			cfp.setContent("reservationProchainRound");
+			cfp.setConversationId("initDisponibilite");
+			myAgent.send(cfp);
+		}
+	}
+	
 	// Comportement "métier", contient la vérification contrat avec le
 	// transporteur, la facturation
 	private class ServiceTour extends CyclicBehaviour {
