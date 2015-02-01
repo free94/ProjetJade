@@ -50,6 +50,9 @@ public class AgentHorloge extends Agent {
 					addBehaviour(new Tour());
 			}
 		});
+		
+		System.out.println("L'horloge : " + getAID().getName()
+				+ " est prêt.");
 	}
 
 	protected void takeDown() {

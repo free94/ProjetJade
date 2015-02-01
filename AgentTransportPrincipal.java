@@ -23,8 +23,6 @@ public class AgentTransportPrincipal extends Agent {
 	private static int prixTransport = 2;
 	private static int coutTransport = 1;
 	// *-*-*-*-*-*-*-*-*-*variables*-*-*-*-*-*-*-*-*-*
-	private HashMap<AID, Devis> devis = new HashMap<AID, Devis>();
-	private ArrayList<AID> abonnes = new ArrayList<AID>();
 	private int CA = 0;
 	private int benefice = 0;
 
@@ -43,17 +41,15 @@ public class AgentTransportPrincipal extends Agent {
 		}
 		
 		//ajouter le comportement pour traiter les demandes de prix
-		addBehaviour(new ServiceDemandePrix());
-		//ajouter le comportement pour traiter les abonnements
-		addBehaviour(new ServiceAbonnement());
-		//ajouter le comportement pour traiter les desabonnements
-		addBehaviour(new ServiceDesabonnement());
+		addBehaviour(new ServiceDemandeTarif());
 		//ajouter le comportement pour la facturation
 		addBehaviour(new ServiceFacturation());
 		//ajout du service pour recevoir les paiement des factures
 		addBehaviour(new ServiceReceptionPaiement());
 		//adoute du service pour fournir information à l'observateur
 		addBehaviour(new ServiceObservateur());
+		System.out.println("Le transporteur principal: " + getAID().getName()
+				+ " est prêt.");
 	}
 
 	protected void takeDown() {
@@ -78,14 +74,10 @@ public class AgentTransportPrincipal extends Agent {
 			if (msg != null) {
 				String title = msg.getContent();
 				ACLMessage reply = msg.createReply();
-				try {
 					reply.setPerformative(ACLMessage.PROPOSE);
-					msg.setContentObject(prixTransport);
+					msg.setContent(prixTransport+"");
 					msg.setConversationId("reponseTarif-transporteurPrincipal");
 					myAgent.send(msg);					
-				} catch (IOException e) {
-					System.out.println("Erreur génération du devis");
-				}
 			} 
 			else {
 				block();
@@ -95,85 +87,85 @@ public class AgentTransportPrincipal extends Agent {
 	
 	// comportement du transporteur quand il reçoit une demande d'un fournisseur
 	// (facture)
-	private class ServiceDemandePrix extends CyclicBehaviour {
-		public void action() {
-			MessageTemplate mt = MessageTemplate.and(
-					MessageTemplate.MatchConversationId("demandeDevis"), MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
-			ACLMessage msg = myAgent.receive(mt);
+//	private class ServiceDemandePrix extends CyclicBehaviour {
+//		public void action() {
+//			MessageTemplate mt = MessageTemplate.and(
+//					MessageTemplate.MatchConversationId("demandeDevis"), MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
+//			ACLMessage msg = myAgent.receive(mt);
+//
+//			if (msg != null) {
+//				// CFP Message received. Process it
+//				String title = msg.getContent();
+//				ACLMessage reply = msg.createReply();
+//
+//				int quantiteDemandee = Integer.parseInt(msg.getContent());
+//				// creation du devis
+//				Devis d = new Devis(msg.getSender(), myAgent.getAID(), quantiteDemandee, (int) System.currentTimeMillis(), quantiteDemandee
+//						* prixTransport);
+//				try {
+//					// Le message est de type "propose" contient le devis d et a
+//					// pour conversation id "propositionDevis"
+//					reply.setPerformative(ACLMessage.PROPOSE);
+//					msg.setContentObject(d);
+//					msg.setConversationId("propositionDevis");
+//					myAgent.send(msg);
+//					// S'il n'y a pas eu de problème on ajoute ce devis à la
+//					// liste des devis émis
+//					devis.put(msg.getSender(), d);
+//				} catch (IOException e) {
+//					System.out.println("Erreur génération du devis");
+//				}
+//			} else {
+//				block();
+//			}
+//		}
+//	}
 
-			if (msg != null) {
-				// CFP Message received. Process it
-				String title = msg.getContent();
-				ACLMessage reply = msg.createReply();
+//	private class ServiceAbonnement extends CyclicBehaviour {
+//
+//		public void action() {
+//			MessageTemplate mt = MessageTemplate.and(MessageTemplate
+//					.MatchPerformative(ACLMessage.REQUEST), MessageTemplate
+//					.MatchConversationId("abonnementTransporteur"));
+//			ACLMessage msg = myAgent.receive(mt);
+//			if (msg != null) {
+//				abonnes.add(msg.getSender());
+//				System.out.println("Le fournisseur "
+//						+ msg.getSender().getLocalName()
+//						+ " est abonné au transporteur principal");
+//			} else {
+//				block();
+//			}
+//
+//		}
+//	}
 
-				int quantiteDemandee = Integer.parseInt(msg.getContent());
-				// creation du devis
-				Devis d = new Devis(msg.getSender(), myAgent.getAID(), quantiteDemandee, (int) System.currentTimeMillis(), quantiteDemandee
-						* prixTransport);
-				try {
-					// Le message est de type "propose" contient le devis d et a
-					// pour conversation id "propositionDevis"
-					reply.setPerformative(ACLMessage.PROPOSE);
-					msg.setContentObject(d);
-					msg.setConversationId("propositionDevis");
-					myAgent.send(msg);
-					// S'il n'y a pas eu de problème on ajoute ce devis à la
-					// liste des devis émis
-					devis.put(msg.getSender(), d);
-				} catch (IOException e) {
-					System.out.println("Erreur génération du devis");
-				}
-			} else {
-				block();
-			}
-		}
-	}
-
-	private class ServiceAbonnement extends CyclicBehaviour {
-
-		public void action() {
-			MessageTemplate mt = MessageTemplate.and(MessageTemplate
-					.MatchPerformative(ACLMessage.REQUEST), MessageTemplate
-					.MatchConversationId("abonnementTransporteur"));
-			ACLMessage msg = myAgent.receive(mt);
-			if (msg != null) {
-				abonnes.add(msg.getSender());
-				System.out.println("Le fournisseur "
-						+ msg.getSender().getLocalName()
-						+ " est abonné au transporteur principal");
-			} else {
-				block();
-			}
-
-		}
-	}
-
-	private class ServiceDesabonnement extends CyclicBehaviour {
-
-		public void action() {
-			MessageTemplate mt = MessageTemplate.and(MessageTemplate
-					.MatchPerformative(ACLMessage.REQUEST), MessageTemplate
-					.MatchConversationId("desabonnementTransporteur"));
-			ACLMessage msg = myAgent.receive(mt);
-			if (msg != null) {
-				if (abonnes.contains(msg.getSender())) {
-					abonnes.remove(msg.getSender());
-					System.out.println("Le fournisseur "
-							+ msg.getSender().getLocalName()
-							+ " est désabonné au transporteur principal");
-				} else {
-					System.out
-							.println("Erreur désabonnement transporteur: Le fournissuer "
-									+ msg.getSender().getLocalName()
-									+ " n'est pas abonné au transporteur principal");
-				}
-
-			} else {
-				block();
-			}
-
-		}
-	}
+//	private class ServiceDesabonnement extends CyclicBehaviour {
+//
+//		public void action() {
+//			MessageTemplate mt = MessageTemplate.and(MessageTemplate
+//					.MatchPerformative(ACLMessage.REQUEST), MessageTemplate
+//					.MatchConversationId("desabonnementTransporteur"));
+//			ACLMessage msg = myAgent.receive(mt);
+//			if (msg != null) {
+//				if (abonnes.contains(msg.getSender())) {
+//					abonnes.remove(msg.getSender());
+//					System.out.println("Le fournisseur "
+//							+ msg.getSender().getLocalName()
+//							+ " est désabonné au transporteur principal");
+//				} else {
+//					System.out
+//							.println("Erreur désabonnement transporteur: Le fournissuer "
+//									+ msg.getSender().getLocalName()
+//									+ " n'est pas abonné au transporteur principal");
+//				}
+//
+//			} else {
+//				block();
+//			}
+//
+//		}
+//	}
 
 	private class ServiceFacturation extends CyclicBehaviour {
 
@@ -186,7 +178,6 @@ public class AgentTransportPrincipal extends Agent {
 			if (msg != null) {
 				AID abonne = msg.getSender();
 				//System.out.println(msg.getContent()+" "+msg.getSender().getLocalName());
-				if (abonnes.contains(abonne)) {
 					int montant= Integer.parseInt(msg.getContent())*prixTransport;
 					FactureTransporteur f = new FactureTransporteur(getLocalName(), montant);
 						
@@ -202,12 +193,6 @@ public class AgentTransportPrincipal extends Agent {
 							// TODO Auto-generated catch block
 							System.out.println("Erreur génération de facture");
 						}
-				} else {
-					System.out
-							.println("Erreur facturation transporteur: Le fournissuer "
-									+ msg.getSender().getLocalName()
-									+ " n'est pas abonné au transporteur principal");
-				}
 
 			} else {
 				block();
@@ -245,7 +230,7 @@ public class AgentTransportPrincipal extends Agent {
 				ACLMessage reply = msg.createReply();
 				int dateActuelle = (int) System.currentTimeMillis();
 				InfoAgent info = new InfoAgent(getLocalName(),
-						abonnes.size() + "", CA + "", benefice + "");
+						0 + "", CA + "", benefice + "");
 				try {
 					reply.setContentObject(info);
 				} catch (IOException e) {

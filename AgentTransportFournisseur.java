@@ -15,16 +15,25 @@ import jade.lang.acl.UnreadableException;
 
 //agent de transport que tout fournisseur peut créer
 public class AgentTransportFournisseur extends Agent {
-	
-	//nos variables
-	private AID createur = null;//AID du créateur du transporteur
-	private AID abonne = null;//Un seul fournisseur peut utiliser la ligne de transport créer par un fournisseur
+
+	// nos variables
+	private AID createur = null;// AID du créateur du transporteur
+	private AID abonne = null;// Un seul fournisseur peut utiliser la ligne de
+								// transport créer par un fournisseur
 	private int CA = 0;
 	private int benefice = 0;
-	private int tarif; 	//prix de l'utilisation de la ligne de transport pour un autre fournisseur que le créateur ! Peut être maj
-	private boolean disponible = false;//indique si le transporteur est laissé disponible par son créateur pour les autres fournisseurs en début de tour
-									   //puis indique simplement si le transporteur peut être pris par un fournisseur ou pas
+	//Cout de transport pour l'ensembe de sa capacité
+	private int coutTransport = 30;
+	private int tarif; // prix de l'utilisation de la ligne de transport pour un
+						// autre fournisseur que le créateur ! Peut être maj
+	private boolean disponible = true;// indique si le transporteur est laissé
+										// disponible par son créateur pour les
+										// autres fournisseurs en début de tour
+										// puis indique simplement si le
+										// transporteur peut être pris par un
+										// fournisseur ou pas
 	private int capaciteTransport = 30;
+
 	protected void setup() {
 		// Enregistrement du service dans le DF
 		DFAgentDescription dfd = new DFAgentDescription();
@@ -38,52 +47,60 @@ public class AgentTransportFournisseur extends Agent {
 		} catch (FIPAException fe) {
 			fe.printStackTrace();
 		}
+		addBehaviour(new ServiceDemandeTarif());
+		addBehaviour(new ServiceReservation());
+		addBehaviour(new ServiceFacturation());
 		addBehaviour(new ServiceObservateur());
-	}
-	
-	protected void takeDown() {
-		// Printout a dismissal message
-		System.out.println("Le transporteur fournisseur: "+getAID().getName()+" est terminé.");
+		System.out.println("Le transporteur fournisseur: " + getAID().getName()
+				+ " est prêt.");
 	}
 
-	//comportement en cas de demande du tarif de location de la ligne de transport -> réponse favorable uniquement si disponible
-	private class demandeTarif extends CyclicBehaviour{		
+	protected void takeDown() {
+		// Printout a dismissal message
+		System.out.println("Le transporteur fournisseur: " + getAID().getName()
+				+ " est terminé.");
+	}
+
+	// comportement en cas de demande du tarif de location de la ligne de
+	// transport -> réponse favorable uniquement si disponible
+	private class ServiceDemandeTarif extends CyclicBehaviour {
 		@Override
 		public void action() {
 			MessageTemplate mt = MessageTemplate.and(
-					MessageTemplate.MatchPerformative(ACLMessage.REQUEST),
+					MessageTemplate.MatchPerformative(ACLMessage.PROPOSE),
 					MessageTemplate.MatchConversationId("demandeTarif"));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
-				ACLMessage msg1 = new ACLMessage(ACLMessage.INFORM);
+				ACLMessage msg1 = msg.createReply();
 				try {
 					msg1.addReceiver(msg.getSender());
-					int date = (int) System.currentTimeMillis();
-					Devis devis = new Devis(msg.getSender(), myAgent.getAID(), capaciteTransport, date, tarif);
-					msg1.setContentObject(devis);
 					msg1.setConversationId("tarifTransporteurFournisseur");
-					if(disponible == false)
-						msg1.setContent("indisponible");
-					else
-						msg1.setContent("disponible");
+					if (disponible == false) {
+						msg1.setPerformative(ACLMessage.REJECT_PROPOSAL);
+					} else {
+						msg1.setPerformative(ACLMessage.ACCEPT_PROPOSAL);
+						int date = (int) System.currentTimeMillis();
+						Devis devis = new Devis(msg.getSender(),
+								myAgent.getAID(), capaciteTransport, date,
+								tarif);
+						msg1.setContentObject(devis);
+					}
 					myAgent.send(msg1);
 				} catch (IOException e) {
 					System.out.println("Erreur génération de facture");
-				}								
-			}
-			else {
+				}
+			} else {
 				block();
 			}
-		}		
+		}
 	}
-	
-	private class initDisponibilite extends OneShotBehaviour{
+
+	private class initDisponibilite extends OneShotBehaviour {
 		@Override
 		public void action() {
 			MessageTemplate mt = MessageTemplate.and(
 					MessageTemplate.MatchConversationId("initDisponibilite"),
-					MessageTemplate.MatchSender(createur)
-					);
+					MessageTemplate.MatchSender(createur));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
 				try {
@@ -91,11 +108,13 @@ public class AgentTransportFournisseur extends Agent {
 				} catch (UnreadableException e) {
 					e.printStackTrace();
 				}
-				//Si on est indisponible, sous entendu réservé par et pour le créateur, on lui transmet de suite la facture
-				if(!disponible){
+				// Si on est indisponible, sous entendu réservé par et pour le
+				// créateur, on lui transmet de suite la facture
+				if (!disponible) {
 					abonne = createur;
 					ACLMessage msg1 = new ACLMessage(ACLMessage.INFORM);
-					FactureTransporteur f = new FactureTransporteur(getLocalName(), 0);
+					FactureTransporteur f = new FactureTransporteur(
+							getLocalName(), 0);
 					try {
 						msg1.addReceiver(createur);
 						msg1.setContentObject(f);
@@ -103,22 +122,27 @@ public class AgentTransportFournisseur extends Agent {
 						myAgent.send(msg1);
 					} catch (IOException e) {
 						System.out.println("Erreur génération de facture");
-					}		
-				}					
-			}
-			else{
+					}
+				}
+			} else {
 				block();
 			}
 		}
 	}
-	
-	//comportement lorsqu'on souhaite réserver la ligne de transport (le rendre indisponible et l'utiliser) 
-	//même fonction que ça soit lorsqu'il s'agit du créateur ou d'un autre fournisseur mais pas dans le contexte fin de tour
-	//où les créateurs on des droits supplémentaires : cf fonction reserverCreateur() 
-	//SI disponible, on se met indisponible, on indique que notre abonne est l'expéditeur du message et on le facture directement
-	private class reserver extends OneShotBehaviour{
-		private int montant = 0; 
+
+	// comportement lorsqu'on souhaite réserver la ligne de transport (le rendre
+	// indisponible et l'utiliser)
+	// même fonction que ça soit lorsqu'il s'agit du créateur(si cela n'a pas
+	// décider de garder cet transporteur à l'interne du tour précédent) ou d'un
+	// autre fournisseur mais pas dans le contexte fin de tour
+	// où les créateurs on des droits supplémentaires : cf fonction
+	// reserverCreateur()
+	// SI disponible, on se met indisponible, on indique que notre abonne est
+	// l'expéditeur du message et on le facture directement
+	private class ServiceReservation extends CyclicBehaviour {
+		private int montant = 0;
 		ACLMessage msg1;
+
 		@Override
 		public void action() {
 			MessageTemplate mt = MessageTemplate.and(
@@ -126,30 +150,15 @@ public class AgentTransportFournisseur extends Agent {
 					MessageTemplate.MatchConversationId("demandeReservation"));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
-				//SI la demande provient du créateur ET qu'on ne s'est pas engagé avec un autre fournisseur
-				if(msg.getSender() == createur && disponible){
+				// SI la demande provient du créateur ET qu'on ne s'est pas
+				// engagé avec un autre fournisseur
+				if (disponible) {
 					disponible = false;
-					abonne = createur;
-					montant = 0;
-				}
-				//Sinon si la demande provient d'un fournisseur autre
-				else{
-					if(disponible){
-						disponible = false;
-						abonne = msg.getSender();
+					abonne = msg.getSender();
+					if (msg.getSender() == createur) {
+						montant = 0;
+					} else {
 						montant = tarif;
-					}
-					//Si on nous fait la demande de réservation mais qu'on est indisponible
-					else{
-						msg1 = new ACLMessage(ACLMessage.REFUSE);
-						try {
-							msg1.addReceiver(msg.getSender());
-							msg1.setContentObject("Transporteur indisponible");
-							msg1.setConversationId("reponseReservation");
-							myAgent.send(msg1);
-						} catch (IOException e) {
-							System.out.println("Probleme envoie message refus reservation transporteurFournisseur : " + myAgent.getLocalName());
-						}					
 					}
 					//la demande a été faite en étant disponible, on y répond favorablement que ça soit pourle créateur ou un autre
 					msg1 = new ACLMessage(ACLMessage.AGREE);
@@ -160,20 +169,36 @@ public class AgentTransportFournisseur extends Agent {
 						myAgent.send(msg1);
 					} catch (IOException e) {
 						System.out.println("Probleme envoie message acceptation reservation transporteurFournisseur : " + myAgent.getLocalName());
-					}		
+					}
+
 				}
-			}
-			else {
+				// Sinon si la demande provient d'un fournisseur autre
+				else {
+					// Si on nous fait la demande de réservation mais qu'on est
+					// indisponible
+					msg1 = new ACLMessage(ACLMessage.REFUSE);
+					try {
+						msg1.addReceiver(msg.getSender());
+						msg1.setConversationId("reponseReservation");
+						myAgent.send(msg1);
+					} catch (Exception e) {
+						System.out
+								.println("Probleme envoie message refus reservation transporteurFournisseur : "
+										+ myAgent.getLocalName());
+					}
+
+				}
+			} else {
 				block();
 			}
 		}
-		
+
 	}
-	
-	/*private class ServiceFacturation extends CyclicBehaviour {
+	private class ServiceFacturation extends CyclicBehaviour {
 
 		private int montant = 0;
 		private AID receiver;
+
 		@Override
 		public void action() {
 			MessageTemplate mt = MessageTemplate.and(
@@ -181,62 +206,60 @@ public class AgentTransportFournisseur extends Agent {
 					MessageTemplate.MatchConversationId("honorerContrat"));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
-				//Si la demande provient du créateur et qu'on a bien que lui comme client
+				// Si la demande provient du créateur et qu'on a bien que lui
+				// comme client
 				if (createur == msg.getSender() && abonne == null) {
 					montant = 0;
 					receiver = createur;
 				}
-				//Sinon c'est que la demande vient d'un abonné qui n'est pas notre créateur
-				else if (abonne == msg.getSender() && abonne != createur){
+				// Sinon c'est que la demande vient d'un abonné qui n'est pas
+				// notre créateur
+				else if (abonne == msg.getSender() && abonne != createur) {
 					montant = tarif;
 					receiver = abonne;
+				} else {
+					System.out
+							.println("ERREUR : le transporteurFournisseur :"
+									+ myAgent.getLocalName()
+									+ " a une demande de facturation d'un fournisseur qui n'est pas son client du tour, le fournisseur : "
+									+ msg.getSender());
 				}
-				else{
-					System.out.println("ERREUR : le transporteurFournisseur :" + myAgent.getLocalName() + " a une demande de facturation d'un fournisseur qui n'est pas son client du tour, le fournisseur : " + msg.getSender());
-				}
-				
-				FactureTransporteur f = new FactureTransporteur(getLocalName(), montant);						
+
+				FactureTransporteur f = new FactureTransporteur(getLocalName(),
+						montant);
 				ACLMessage msg1 = new ACLMessage(ACLMessage.INFORM);
 				try {
 					msg1.addReceiver(receiver);
 					msg1.setContentObject(f);
 					msg1.setConversationId("factureTransport");
 					myAgent.send(msg1);
+					benefice -= coutTransport;
 				} catch (IOException e) {
 					// TODO Auto-generated catch block
 					System.out.println("Erreur génération de facture");
-				}								
-			} else {
-				block();
-			}
-		}
-	}*/
-	
-	/*private class ServiceAbonnement extends CyclicBehaviour {
-
-		public void action() {
-			MessageTemplate mt = MessageTemplate
-					.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL);
-			ACLMessage msg = myAgent.receive(mt);
-			if (msg != null) {
-				
-				//ACLMessage reply = msg.createReply();
-				if(msg.getConversationId() == "abonnementCreateur"){
-					createur = msg.getSender();
-					abonnes.add(createur);
 				}
-				//Cas rendu 3 : abonnement d'autres fournisseurs
-				//else {
-				//	reply.setPerformative(ACLMessage.FAILURE);
-				//	reply.setContent("capacité insuffisante");
-				//}
-				//myAgent.send(reply);
 			} else {
 				block();
 			}
-
 		}
-	}*/
+	}
+
+	/*
+	 * private class ServiceAbonnement extends CyclicBehaviour {
+	 * 
+	 * public void action() { MessageTemplate mt = MessageTemplate
+	 * .MatchPerformative(ACLMessage.ACCEPT_PROPOSAL); ACLMessage msg =
+	 * myAgent.receive(mt); if (msg != null) {
+	 * 
+	 * //ACLMessage reply = msg.createReply(); if(msg.getConversationId() ==
+	 * "abonnementCreateur"){ createur = msg.getSender(); abonnes.add(createur);
+	 * } //Cas rendu 3 : abonnement d'autres fournisseurs //else { //
+	 * reply.setPerformative(ACLMessage.FAILURE); //
+	 * reply.setContent("capacité insuffisante"); //} //myAgent.send(reply); }
+	 * else { block(); }
+	 * 
+	 * } }
+	 */
 
 	private class ServiceObservateur extends CyclicBehaviour {
 
@@ -248,8 +271,8 @@ public class AgentTransportFournisseur extends Agent {
 			if (msg != null) {
 				ACLMessage reply = msg.createReply();
 				int dateActuelle = (int) System.currentTimeMillis();
-				InfoAgent info = new InfoAgent(getLocalName(),
-						abonne+ "", CA + "", benefice + "");
+				InfoAgent info = new InfoAgent(getLocalName(), 0+"", CA
+						+ "", benefice + "");
 				try {
 					reply.setContentObject(info);
 				} catch (IOException e) {
@@ -264,5 +287,22 @@ public class AgentTransportFournisseur extends Agent {
 
 		}
 
+	}
+	
+	private class ServiceReceptionPaiement extends CyclicBehaviour{
+
+		@Override
+		public void action() {
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchPerformative(ACLMessage.CONFIRM),
+					MessageTemplate.MatchConversationId("paiementFactureTransporteur"));
+			ACLMessage msg = myAgent.receive(mt);
+			if (msg != null) {
+				CA += Integer.parseInt(msg.getContent());
+				benefice += Integer.parseInt(msg.getContent());
+			} else {
+				block();
+			}	
+		}
 	}
 }
