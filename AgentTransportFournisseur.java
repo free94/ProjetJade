@@ -24,7 +24,7 @@ public class AgentTransportFournisseur extends Agent {
 	private int tarif; 	//prix de l'utilisation de la ligne de transport pour un autre fournisseur que le créateur ! Peut être maj
 	private boolean disponible = false;//indique si le transporteur est laissé disponible par son créateur pour les autres fournisseurs en début de tour
 									   //puis indique simplement si le transporteur peut être pris par un fournisseur ou pas
-	
+	private int capaciteTransport = 30;
 	protected void setup() {
 		// Enregistrement du service dans le DF
 		DFAgentDescription dfd = new DFAgentDescription();
@@ -46,7 +46,7 @@ public class AgentTransportFournisseur extends Agent {
 		System.out.println("Le transporteur fournisseur: "+getAID().getName()+" est terminé.");
 	}
 
-	//comportement en cas de demande du tarif de location de la ligne de transport -> aucune contrainte ni contrôle peu importe qui demande et quand
+	//comportement en cas de demande du tarif de location de la ligne de transport -> réponse favorable uniquement si disponible
 	private class demandeTarif extends CyclicBehaviour{		
 		@Override
 		public void action() {
@@ -58,11 +58,16 @@ public class AgentTransportFournisseur extends Agent {
 				ACLMessage msg1 = new ACLMessage(ACLMessage.INFORM);
 				try {
 					msg1.addReceiver(msg.getSender());
-					msg1.setContentObject(tarif);
+					int date = (int) System.currentTimeMillis();
+					Devis devis = new Devis(msg.getSender(), myAgent.getAID(), capaciteTransport, date, tarif);
+					msg1.setContentObject(devis);
 					msg1.setConversationId("tarifTransporteurFournisseur");
+					if(disponible == false)
+						msg1.setContent("indisponible");
+					else
+						msg1.setContent("disponible");
 					myAgent.send(msg1);
 				} catch (IOException e) {
-					// TODO Auto-generated catch block
 					System.out.println("Erreur génération de facture");
 				}								
 			}

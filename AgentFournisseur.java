@@ -1,6 +1,8 @@
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 
 import jade.core.AID;
@@ -44,7 +46,7 @@ public class AgentFournisseur extends Agent {
 	
 	private ArrayList<AID> transporteursUtilises = new ArrayList<AID>();// transporteurs utilisés sur le tour courant
 	
-	private HashMap<AID, Devis> transporteursDisponibles = new HashMap<AID, Devis>();// transporteurs disponibles au début du tour
+	private ArrayList<Devis> transporteursDisponibles = new ArrayList<Devis>();// transporteurs disponibles au début du tour
 	
 	private ArrayList<AID> mesTransporteurs = new ArrayList<AID>();//AID de mes transporteurs (créés) 
 	
@@ -162,6 +164,17 @@ public class AgentFournisseur extends Agent {
 		System.out.println("Le fournisseur: " + getAID().getName()
 				+ " est terminé.");
 	}
+	public class comparateurDevis implements Comparator<Devis>{
+		public int compare(Devis d1, Devis d2){
+			if (Integer.compare(d1.getMontant(), d2.getMontant()) > 0) {
+				return -1;
+			} else if (Double.compare(d1.getMontant(), d2.getMontant()) < 0) {
+				return 1;        	
+			} else {
+				return 0;
+			}
+		}
+	}
 	
 	private class ServiceDemandePrixFournisseurPrincipal extends OneShotBehaviour{
 
@@ -182,7 +195,11 @@ public class AgentFournisseur extends Agent {
 			ACLMessage msg = myAgent.receive(mt);
 			
 			if (msg != null) {
-				tarifTransporteurPrincipal = (Integer) msg.getContentObject();					
+				try {
+					tarifTransporteurPrincipal = (Integer) msg.getContentObject();
+				} catch (UnreadableException e) {
+					e.printStackTrace();
+				}					
 			} 
 			else {
 				block();
@@ -304,145 +321,8 @@ public class AgentFournisseur extends Agent {
 
 	}
 	
-	//comportement gérant l'intégralité de la gestion des transporteurs : création d'un trnsporteur perso ou non, etc
-	/*private class ServiceTransport extends OneShotBehaviour{
-		private MessageTemplate mt;
-		private double total = 0;
-		
-		public void action() {
-			
-			//On vérifie à chaque fois l'ensemble des transporteurs dispo car on peut dans le dernier rendu, choisir le transporteur d'n autre fournisseur
-			//et un autre fournisseur peut décider de créer son propre transporteur à tout moment
-					
-			//recherche transporteur(s) fournisseur(s)
-			DFAgentDescription template = new DFAgentDescription();
-			ServiceDescription sd = new ServiceDescription();
-			sd.setType("TransporteurFournisseur");
-			template.addServices(sd);
-			try {
-				DFAgentDescription[] result = DFService.search(myAgent, template);
-				for (DFAgentDescription r : result) {
-					if(!transporteurs.containsKey(r))
-						transporteurs.put(r.getName(), null);
-				}			
-				
-			} catch (FIPAException fe) {
-				fe.printStackTrace();
-			}
-			
-			//********************************ici notre liste de transporteurs est maj
-			
-					
-			// le fournisseur souhaite transporter l'ensemble de l'electricité
-			// que ses abonnés lui commandent
-			int capa = capaciteUtilisee;
-			//Si on a ses propres transporteurs, on les privilégie et on leur fait transporter le maximum
-			if(!mesTransporteurs.isEmpty()){
-				capa -= mesTransporteurs.size() * capaciteTransport;			
-			}
-			//Si le transporteur perso peut transporter + que la quantité total qu'on fournit, on arrête ici pas besoin de devis		
-			if(capa <= 0){				
-				return;
-			}
-			// Envoi de la demande de prix à tous les transporteurs DONT ON NE
-			// CONNAIT PAS LES TARIFS (ils sont fixes, n'évolueront pas !)
-			int nbMsg = 0;
-			ACLMessage cfp = new ACLMessage(ACLMessage.REQUEST);
-			for (AID t : transporteurs.keySet()) {
-				if (transporteurs.get(t).equals(null)) {
-					// Si le devis est null, on ajoute le transporteur comme un
-					// recepteur
-					cfp.addReceiver(t);
-					nbMsg++;
-				}
-			}
-			cfp.setContent(String.valueOf(capa));
-			cfp.setConversationId("demandeDevis");
-			cfp.setReplyWith("cfp" + System.currentTimeMillis()); // Unique //
-																	// value
-			myAgent.send(cfp);
-			// Preparer le template pour recevoir la réponse
-			mt = MessageTemplate.and(
-					MessageTemplate.MatchConversationId("propositionDevis"),
-					MessageTemplate.MatchInReplyTo(cfp.getReplyWith()));
-
-				// comparer au coût de création de son propre four : sur une
-				// durée d fixée
-				
-				int nombreDevis = 0;
-				ACLMessage reply;
-				Devis d = null;
-				Devis devisMoinsCher = new Devis(null,null, 0, 0, Integer.MAX_VALUE);
-				for (int i = 0; i < nbMsg; i++) {
-					//réponse du transporteur
-					reply = myAgent.blockingReceive(mt);
-					if (reply != null) {
-						if (reply.getPerformative() == ACLMessage.PROPOSE) {
-						// récupération du devis
-							try {
-								d = (Devis) reply.getContentObject();
-								if (d.getMontant()<devisMoinsCher.getMontant()) {
-									devisMoinsCher = d;
-								}
-								transporteurs.put(reply.getSender(), d);
-							} catch (UnreadableException e) {
-								e.printStackTrace();
-							}
-						}
-						else {
-							block();
-						}
-					}
-					
-				}
-				//Choix de la création du transporteur interne ou non
-				if (devisMoinsCher.getMontant() < coutCreationTransporteur / nombrePeriodeRentabiliserCreation) {
-					//System.err.println("------On passe par un transporteur tierce");
-					addBehaviour(new AbonnementTransporteur(devisMoinsCher.getAidEmetteur()));
-				} else {
-					// creation transporteur moins cher				
-					//System.err.println("++++++CREATION DE TRANSPORTEUR PERSO");
-					try {
-						AID[] arg = { myAgent.getAID() };
-						AgentController monTransporteur = myAgent.getContainerController()
-								.createNewAgent(
-										"AgentTransportFournisseur-"
-												+ myAgent.getName(),
-										AgentTransportFournisseur.class
-												.getName(), arg);
-						monTransporteur.start();
-						FactureTransporteur f = new FactureTransporteur(
-								"AgentTransportFournisseur",
-								coutCreationTransporteur);
-						//enregistrement de la facture
-						facturesTransport.add(f);
-						//diminution des benefs
-						benefice -= f.getMontant();
-						// recherche notre transporteur dans le DF
-						template = new DFAgentDescription();
-						sd = new ServiceDescription();
-						sd.setType("TransporteurFournisseur");
-						sd.setName("AgentTransportFournisseur-"
-								+ myAgent.getName());
-						template.addServices(sd);
-
-						// on enregistre l'AID de notre agent de transport
-						DFAgentDescription[] result = DFService.search(myAgent,
-								template);
-						mesTransporteurs.add(result[0].getName());
-						transporteursUtilises.add(result[0].getName());
-					} catch (StaleProxyException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					} catch (FIPAException e) {
-						// TODO Auto-generated catch block
-						e.printStackTrace();
-					}					
-				}
-		}
-	}*/
-
 	//réception du message "fin de tour pour les consommateurs" de la part de l'agent horloge -> lancement politique de transport
+	//consiste uniquement en une phase de décisions pour le prochain tour, impliquant nos propres transporteurs.
 	private class PolitiqueTransport extends CyclicBehaviour{
 		@Override
 		public void action(){
@@ -464,22 +344,33 @@ public class AgentFournisseur extends Agent {
 						//on l'indique comme transporteur utilisé
 						transporteursUtilises.add(monTansporteur);
 						initDisponibilite(false, monTansporteur);
+						totalAtransporter -= capaciteTransport;
 					}
 					else{
 						//calcul de ce qu'il en couterait de passer par un autre transporteur pour ce qu'il reste à transporter
-						int cout = 0;						
+						int cout = tarifTransporteurPrincipal * totalAtransporter;
+						//trie de notre liste de devis par ordre de montant
+						Collections.sort(transporteursDisponibles, new comparateurDevis());
+						
+						if(transporteursDisponibles.get(0).getMontant() < cout)
+							cout = transporteursDisponibles.get(0).getMontant();
+						
 						//Si cela est rentable de laisser disponible le transporteur pour le louer, même en louant nous même de quoi transporter 
 						//ce qu'il reste d'electricité à fournir alors on laisse disponible 
 						if(tarifTransporteur - cout > 0){
-							initDisponibilite(true, monTansporteur);
+							//on laisse disponible notre transporteur
+							initDisponibilite(true, monTansporteur);							
 						}
-					}					
-				}
+						else
+							initDisponibilite(false, monTansporteur);
+					}						
+				}				
 			}
 			else{
 				block();
 			}
 		}
+		//methode appelée pour indiquer à un de nos transporteurs qu'on le réserve ou pas pour le prochain tour 
 		private void initDisponibilite(boolean disponibilite, AID monTransporteur){
 			//en fonction de ce qui a été décidé, on indique si le transporteur doit se rendre disponible ou s'il est réservé
 			ACLMessage cfp = new ACLMessage(ACLMessage.REQUEST);
@@ -493,6 +384,104 @@ public class AgentFournisseur extends Agent {
 			cfp.setConversationId("initDisponibilite");
 			myAgent.send(cfp);
 		}
+	}
+	
+	//comportement gérant le transport de l'electricité pour le tour
+	private class ServiceTransport extends CyclicBehaviour{
+		int totalAtransporter = 0;
+		ArrayList<AID> tousLesTransporteursFour = null;
+		@Override
+		public void action() {
+			//calcul du total d'electricité à transporter
+			for (Abonnement a : abonnements.values()) {
+				totalAtransporter += a.getQuantite();
+			}
+			//on a reservé auparavant des transporteurs qui nous appartiennent, on les utilise en priorité
+			totalAtransporter -= capaciteTransport * transporteursUtilises.size();//transporteursUtilises ne contient pour l'instant QUE des transporteurs perso
+			//s'il reste de l'electricité à transporter sous entendu nos propres transporteurs ne suffisent pas
+			if(totalAtransporter > 0){
+				//récupération des tarifs de tous les transporteurs fournisseurs DISPONIBLES connus dans le DF
+				transporteursDisponibles.clear();
+				transporteursDisponibles = maj(transporteursDisponibles);
+				
+				MessageTemplate mt = MessageTemplate.MatchConversationId("reponseReservation");
+				//à la première réponse traitée on arrête on sort du for ou directement si on voit que rien n'est moins cher que le transporteur principal
+				
+				for (Devis d : transporteursDisponibles) {
+					if(d.getMontant() > tarifTransporteurPrincipal * totalAtransporter){
+						//traitement du transport avec le transporteur principal
+						/*TODO
+						 * Abonnement ou pas ?
+						 * Direct demande d'honorer contrat ?
+						 * */
+						break;
+					}
+					else{
+						//demande de réservation du transporteur car moins cher que le transporteur principal
+						/*TODO
+						 * Si c'est accecpté
+						 * Si c'est refusé
+						 * */
+						totalAtransporter -= d.getQuantiteElectricite();
+						if(totalAtransporter <= 0)
+							break;
+					}
+				}
+				
+			}
+		}
+		
+		private ArrayList<Devis> maj(ArrayList<Devis> transporteursDisponibles){
+			
+			//maj depuis le DF de tous les transporteurs fournisseurs disponibles
+			DFAgentDescription template = new DFAgentDescription();
+			ServiceDescription sd = new ServiceDescription();
+			sd.setType("TransporteurFournisseur");
+			template.addServices(sd);
+			try {
+				DFAgentDescription[] result = DFService.search(myAgent, template);
+				tousLesTransporteursFour = new ArrayList<AID>();
+				for (int i = 0; i < result.length; ++i) {
+					tousLesTransporteursFour.add(result[i].getName());
+				}
+			} catch (FIPAException fe) {
+				fe.printStackTrace();
+			}
+			
+			//envoie d'une demande de devis à tous les transporteurs fournisseurs : si réponse => dispo, sinon = indispo
+			ACLMessage cfp = new ACLMessage(ACLMessage.CFP);
+			for (AID a : tousLesTransporteursFour) {
+				cfp.addReceiver(a);
+			}
+			cfp.setContent("demandeTarif");
+			cfp.setConversationId("demandeTarif");
+			cfp.setReplyWith("cfp" + System.currentTimeMillis()); // Unique																		// value
+			myAgent.send(cfp);
+			// Preparer le template pour recevoir la réponse
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchConversationId("tarifTransporteurFournisseur"),
+					MessageTemplate.MatchInReplyTo(cfp.getReplyWith()));
+			
+			//obtention des réponses
+			ACLMessage reply = myAgent.receive(mt);
+			int nombreReponses = 0;
+			if (reply != null) {
+				nombreReponses++;
+				if(reply.getContent().equals("disponible")){
+					try {
+						transporteursDisponibles.add((Devis) reply.getContentObject());
+					} catch (UnreadableException e) {
+						e.printStackTrace();
+					}
+				}
+			} 
+			else {
+				block();
+			}
+			Collections.sort(transporteursDisponibles, new comparateurDevis());
+			return transporteursDisponibles;
+		}
+		
 	}
 	
 	// Comportement "métier", contient la vérification contrat avec le
@@ -686,3 +675,140 @@ public class AgentFournisseur extends Agent {
 	
 	
 }
+//comportement gérant l'intégralité de la gestion des transporteurs : création d'un trnsporteur perso ou non, etc
+/*private class ServiceTransport extends OneShotBehaviour{
+	private MessageTemplate mt;
+	private double total = 0;
+	
+	public void action() {
+		
+		//On vérifie à chaque fois l'ensemble des transporteurs dispo car on peut dans le dernier rendu, choisir le transporteur d'n autre fournisseur
+		//et un autre fournisseur peut décider de créer son propre transporteur à tout moment
+				
+		//recherche transporteur(s) fournisseur(s)
+		DFAgentDescription template = new DFAgentDescription();
+		ServiceDescription sd = new ServiceDescription();
+		sd.setType("TransporteurFournisseur");
+		template.addServices(sd);
+		try {
+			DFAgentDescription[] result = DFService.search(myAgent, template);
+			for (DFAgentDescription r : result) {
+				if(!transporteurs.containsKey(r))
+					transporteurs.put(r.getName(), null);
+			}			
+			
+		} catch (FIPAException fe) {
+			fe.printStackTrace();
+		}
+		
+		//********************************ici notre liste de transporteurs est maj
+		
+				
+		// le fournisseur souhaite transporter l'ensemble de l'electricité
+		// que ses abonnés lui commandent
+		int capa = capaciteUtilisee;
+		//Si on a ses propres transporteurs, on les privilégie et on leur fait transporter le maximum
+		if(!mesTransporteurs.isEmpty()){
+			capa -= mesTransporteurs.size() * capaciteTransport;			
+		}
+		//Si le transporteur perso peut transporter + que la quantité total qu'on fournit, on arrête ici pas besoin de devis		
+		if(capa <= 0){				
+			return;
+		}
+		// Envoi de la demande de prix à tous les transporteurs DONT ON NE
+		// CONNAIT PAS LES TARIFS (ils sont fixes, n'évolueront pas !)
+		int nbMsg = 0;
+		ACLMessage cfp = new ACLMessage(ACLMessage.REQUEST);
+		for (AID t : transporteurs.keySet()) {
+			if (transporteurs.get(t).equals(null)) {
+				// Si le devis est null, on ajoute le transporteur comme un
+				// recepteur
+				cfp.addReceiver(t);
+				nbMsg++;
+			}
+		}
+		cfp.setContent(String.valueOf(capa));
+		cfp.setConversationId("demandeDevis");
+		cfp.setReplyWith("cfp" + System.currentTimeMillis()); // Unique //
+																// value
+		myAgent.send(cfp);
+		// Preparer le template pour recevoir la réponse
+		mt = MessageTemplate.and(
+				MessageTemplate.MatchConversationId("propositionDevis"),
+				MessageTemplate.MatchInReplyTo(cfp.getReplyWith()));
+
+			// comparer au coût de création de son propre four : sur une
+			// durée d fixée
+			
+			int nombreDevis = 0;
+			ACLMessage reply;
+			Devis d = null;
+			Devis devisMoinsCher = new Devis(null,null, 0, 0, Integer.MAX_VALUE);
+			for (int i = 0; i < nbMsg; i++) {
+				//réponse du transporteur
+				reply = myAgent.blockingReceive(mt);
+				if (reply != null) {
+					if (reply.getPerformative() == ACLMessage.PROPOSE) {
+					// récupération du devis
+						try {
+							d = (Devis) reply.getContentObject();
+							if (d.getMontant()<devisMoinsCher.getMontant()) {
+								devisMoinsCher = d;
+							}
+							transporteurs.put(reply.getSender(), d);
+						} catch (UnreadableException e) {
+							e.printStackTrace();
+						}
+					}
+					else {
+						block();
+					}
+				}
+				
+			}
+			//Choix de la création du transporteur interne ou non
+			if (devisMoinsCher.getMontant() < coutCreationTransporteur / nombrePeriodeRentabiliserCreation) {
+				//System.err.println("------On passe par un transporteur tierce");
+				addBehaviour(new AbonnementTransporteur(devisMoinsCher.getAidEmetteur()));
+			} else {
+				// creation transporteur moins cher				
+				//System.err.println("++++++CREATION DE TRANSPORTEUR PERSO");
+				try {
+					AID[] arg = { myAgent.getAID() };
+					AgentController monTransporteur = myAgent.getContainerController()
+							.createNewAgent(
+									"AgentTransportFournisseur-"
+											+ myAgent.getName(),
+									AgentTransportFournisseur.class
+											.getName(), arg);
+					monTransporteur.start();
+					FactureTransporteur f = new FactureTransporteur(
+							"AgentTransportFournisseur",
+							coutCreationTransporteur);
+					//enregistrement de la facture
+					facturesTransport.add(f);
+					//diminution des benefs
+					benefice -= f.getMontant();
+					// recherche notre transporteur dans le DF
+					template = new DFAgentDescription();
+					sd = new ServiceDescription();
+					sd.setType("TransporteurFournisseur");
+					sd.setName("AgentTransportFournisseur-"
+							+ myAgent.getName());
+					template.addServices(sd);
+
+					// on enregistre l'AID de notre agent de transport
+					DFAgentDescription[] result = DFService.search(myAgent,
+							template);
+					mesTransporteurs.add(result[0].getName());
+					transporteursUtilises.add(result[0].getName());
+				} catch (StaleProxyException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				} catch (FIPAException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}					
+			}
+	}
+}*/

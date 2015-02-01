@@ -108,9 +108,8 @@ public class AgentTransportPrincipal extends Agent {
 
 				int quantiteDemandee = Integer.parseInt(msg.getContent());
 				// creation du devis
-				Devis d = new Devis(msg.getSender(), quantiteDemandee,
-						(int) System.currentTimeMillis(), quantiteDemandee
-								* prixTransport);
+				Devis d = new Devis(msg.getSender(), myAgent.getAID(), quantiteDemandee, (int) System.currentTimeMillis(), quantiteDemandee
+						* prixTransport);
 				try {
 					// Le message est de type "propose" contient le devis d et a
 					// pour conversation id "propositionDevis"
