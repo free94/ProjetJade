@@ -107,23 +107,7 @@ public class AgentTransportFournisseur extends Agent {
 					disponible = (Boolean) msg.getContentObject();
 				} catch (UnreadableException e) {
 					e.printStackTrace();
-				}
-				// Si on est indisponible, sous entendu réservé par et pour le
-				// créateur, on lui transmet de suite la facture
-				if (!disponible) {
-					abonne = createur;
-					ACLMessage msg1 = new ACLMessage(ACLMessage.INFORM);
-					FactureTransporteur f = new FactureTransporteur(
-							getLocalName(), 0);
-					try {
-						msg1.addReceiver(createur);
-						msg1.setContentObject(f);
-						msg1.setConversationId("factureTransport");
-						myAgent.send(msg1);
-					} catch (IOException e) {
-						System.out.println("Erreur génération de facture");
-					}
-				}
+				}				
 			} else {
 				block();
 			}
