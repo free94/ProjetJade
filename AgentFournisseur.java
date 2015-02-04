@@ -1,5 +1,4 @@
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -90,9 +89,11 @@ public class AgentFournisseur extends Agent {
 														// perso
 
 	private static int coutProduction = 1;
-
-	private static int prixVente = 10;
-
+	//prix de vente de l'electricié aux clients
+	private int prixVente = 10;
+	//prix d'achat de l'electricié depuis clients
+	private int prixAchat = 2;
+	
 	private static int periodeFacturation = 1000;
 
 	private HashMap<AID, Abonnement> abonnements = new HashMap<AID, Abonnement>();// liste
@@ -148,8 +149,6 @@ public class AgentFournisseur extends Agent {
 		} catch (FIPAException fe) {
 			fe.printStackTrace();
 		}
-
-		
 
 		// abonnener au transporteur principal
 		// addBehaviour(new AbonnementTransporteur(transporteurPrincipal));
@@ -254,7 +253,13 @@ public class AgentFournisseur extends Agent {
 				if (capaciteProduction > capaciteUtilisee) {
 					// si on dispose encore de capacité, répondre notre prix
 					reply.setPerformative(ACLMessage.PROPOSE);
-					reply.setContent("" + prixVente);
+					int[] devis = {prixVente,prixAchat};
+					try {
+						reply.setContentObject(devis);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				} else {
 					reply.setPerformative(ACLMessage.REFUSE);
 					reply.setContent("capacité saturé");
@@ -291,6 +296,13 @@ public class AgentFournisseur extends Agent {
 							+ msg.getSender().getLocalName()
 							+ " est abonné pour une quantité de "
 							+ consommation);
+					int[] devis  = {prixVente, prixAchat};
+					try {
+						reply.setContentObject(devis);
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				} else {
 					reply.setPerformative(ACLMessage.FAILURE);
 					reply.setContent("capacité insuffisante");
@@ -314,7 +326,7 @@ public class AgentFournisseur extends Agent {
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
 				capaciteUtilisee -= abonnements.get(msg.getSender())
-						.getQuantite();
+						.getQuantiteConsommee();
 				abonnements.remove(msg.getSender());
 
 			} else {
@@ -372,7 +384,7 @@ public class AgentFournisseur extends Agent {
 				// probablement à transporter étant donné les derniers chiffres
 				// des clients
 				for (Abonnement a : abonnements.values()) {
-					totalAtransporter += a.getQuantite();
+					totalAtransporter += a.getQuantiteConsommee();
 				}
 				transporteursUtilises.clear();
 				// deuxième étape on utilise chaque transporteur perso sans
@@ -661,11 +673,12 @@ public class AgentFournisseur extends Agent {
 					for (AID a : abonnements.keySet()) {
 						int periodeConsommation = dateActuelle
 								- abonnements.get(a).getDateAbonnement();
-						quantite = (int) abonnements.get(a).getQuantite();// quantité
-																			// à
-																			// chaque
-																			// tic
-																			// d'horloge
+						quantite = (int) abonnements.get(a)
+								.getQuantiteConsommee();// quantité
+						// à
+						// chaque
+						// tic
+						// d'horloge
 						// Calculer le montant de facturation
 						Facture f;
 						if (periodeConsommation < periodeFacturation) {
@@ -710,9 +723,9 @@ public class AgentFournisseur extends Agent {
 					msgFinDeTour.setConversationId("msgFinDeTour");
 					msgFinDeTour.addReceiver(horloge);
 					myAgent.send(msgFinDeTour);
-				} 
+				}
 
-			}else {
+			} else {
 				block();
 			}
 		}
@@ -775,7 +788,7 @@ public class AgentFournisseur extends Agent {
 				if (abonnements.get(msg.getSender()) == null)
 					System.err
 							.println("SENDER INTROUVABLE DANS LA LISTE DES ABONNES");
-				abonnements.get(msg.getSender()).setDateDerniereFacture(
+				abonnements.get(msg.getSender()).setDateDernierePaiement(
 						(int) System.currentTimeMillis());
 			} else {
 				block();
@@ -789,11 +802,15 @@ public class AgentFournisseur extends Agent {
 		@Override
 		public void action() {
 			for (AID abonne : abonnements.keySet()) {
-				if ((int) System.currentTimeMillis() > 100000 + abonnements
-						.get(abonne).getDateDernierePaiement()) {
+				if ((int) System.currentTimeMillis() > 10000 + abonnements.get(
+						abonne).getDateDernierePaiement()) {
 					benefice -= amande;
 					System.out.println("Une amande de " + amande
 							+ " est payé à cause d'une livraison non assurée");
+					System.err.println(abonnements.get(abonne)
+							.getDateDernierePaiement()
+							+ "---"
+							+ abonne.getLocalName());
 				}
 			}
 

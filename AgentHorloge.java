@@ -2,7 +2,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
@@ -21,13 +20,19 @@ public class AgentHorloge extends Agent {
 	private int periodeTic = 1000;
 	// Les fournisseur inscrit dans le système
 	private ArrayList<AID> listeFour = new ArrayList<AID>();
-	// Les fournisseur vers lesquels on a envoyé les messages de début de tour et attend leur réponses
+	// Les fournisseur vers lesquels on a envoyé les messages de début de tour
+	// et attend leur réponses
 	private ArrayList<AID> listeFourReponse = new ArrayList<AID>();
-	// Les transporteur inscrit dans le système
+	// Les transporteurs inscrit dans le système
 	private ArrayList<AID> listeTrans = new ArrayList<AID>();
-	//L'observateur
+	// Les consommateurs inscrit dans le système
+	private ArrayList<AID> listeConso = new ArrayList<AID>();
+	// Les consommateurs vers lesquels on a envoyé les messages de début de tour
+	// et attend leur réponses
+	private ArrayList<AID> listeConsoReponse = new ArrayList<AID>();
+	// L'observateur
 	private AID observateur = null;
-	
+
 	protected void setup() {
 		// Enregistrement du service dans le DF
 		DFAgentDescription dfd = new DFAgentDescription();
@@ -41,78 +46,83 @@ public class AgentHorloge extends Agent {
 		} catch (FIPAException fe) {
 			fe.printStackTrace();
 		}
-		//ajouter le service pour traiter les demandes d'inscription des fournisseur/Transporteur/observateur
+		// ajouter le service pour traiter les demandes d'inscription des
+		// fournisseur/Transporteur/observateur
 		addBehaviour(new ServiceInscription());
-		
+
 		// Traiter les messages de fin de tour à chaque tic d'horloge
 		addBehaviour(new TickerBehaviour(this, periodeTic) {
 			protected void onTick() {
-					addBehaviour(new Tour());
+				addBehaviour(new Tour());
 			}
 		});
-		
-		System.out.println("L'horloge : " + getAID().getName()
-				+ " est prêt.");
+
+		System.out.println("L'horloge : " + getAID().getName() + " est prêt.");
 	}
 
 	protected void takeDown() {
 		// Deregister from the yellow pages
 		try {
 			DFService.deregister(this);
-		}
-		catch (FIPAException fe) {
+		} catch (FIPAException fe) {
 			fe.printStackTrace();
 		}
 		// Printout a dismissal message
 		System.out.println("L'agent horlogue est terminé.");
 	}
-	
-	private class ServiceInscription extends CyclicBehaviour{
+
+	private class ServiceInscription extends CyclicBehaviour {
 
 		public void action() {
-			MessageTemplate mt = MessageTemplate.and(MessageTemplate.MatchPerformative(ACLMessage.REQUEST), MessageTemplate.MatchConversationId("inscriptionHorloge"));
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchPerformative(ACLMessage.REQUEST),
+					MessageTemplate.MatchConversationId("inscriptionHorloge"));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
 				String demandeur = msg.getContent();
 				if (demandeur.equals("fournisseur")) {
 					listeFour.add(msg.getSender());
-				}else if (demandeur.equals("transporteur")) {
+				} else if (demandeur.equals("transporteur")) {
 					listeTrans.add(msg.getSender());
-				}else if (demandeur.equals("observateur")) {
-					observateur=msg.getSender();
+				} else if (demandeur.equals("observateur")) {
+					observateur = msg.getSender();
+				} else if (demandeur.equals("consommateur")) {
+					listeConso.add(msg.getSender());
 				}
-				System.out.println("un agent "+demandeur+":"+msg.getSender().getLocalName()+" est incrit à l'horloge");
-			}
-			else {
+				System.out.println("un agent " + demandeur + ":"
+						+ msg.getSender().getLocalName()
+						+ " est incrit à l'horloge");
+			} else {
 				block();
 			}
 
-		}		
+		}
 	}
-	
-	private class Tour extends Behaviour{
+
+	private class Tour extends Behaviour {
 		private int step = 0;
 		private MessageTemplate mt = MessageTemplate
-		.MatchConversationId("msgFinDeTour");
+				.MatchConversationId("msgFinDeTour");
+
 		@Override
 		public void action() {
 			switch (step) {
 			case 0:
-				//Reception de messages fin de tour
+				// Reception de messages fin de tour
 				if (listeFourReponse.size() == 0) {
-					//Tous les messages fin de tour sont recu
+					// Tous les messages fin de tour sont recu
 					step = 1;
-				}else{
+				} else {
 					ACLMessage msg = receive(mt);
 					if (msg != null) {
 						listeFourReponse.remove(msg.getSender());
-					}else{
+					} else {
 						block();
 					}
 				}
 				break;
 			case 1:
-				//Emettre les messages debut de tour
+				// Emettre les messages debut de tour
 				ACLMessage cmd = new ACLMessage(ACLMessage.INFORM);
 				for (AID fournisseur : listeFour) {
 					cmd.addReceiver(fournisseur);
@@ -124,22 +134,22 @@ public class AgentHorloge extends Agent {
 				break;
 			}
 
-//		for (AID transporteur : listeTrans) {
-//			MessageTemplate mt = MessageTemplate.and(MessageTemplate
-//					.MatchConversationId("msgFinDeTour"),
-//					MessageTemplate.MatchSender(transporteur));
-//			ACLMessage msg = blockingReceive(mt);
-//		}
-//		MessageTemplate mt = MessageTemplate.and(MessageTemplate
-//				.MatchConversationId("msgFinDeTour"),
-//				MessageTemplate.MatchSender(observateur));
-//		ACLMessage msg = blockingReceive(mt);
-		//Informer les agents de commencer un nouveau tour
-		
-//		for (AID transporteur : listeTrans) {
-//			cmd.addReceiver(transporteur);
-//		}
-//		cmd.addReceiver(observateur);
+			// for (AID transporteur : listeTrans) {
+			// MessageTemplate mt = MessageTemplate.and(MessageTemplate
+			// .MatchConversationId("msgFinDeTour"),
+			// MessageTemplate.MatchSender(transporteur));
+			// ACLMessage msg = blockingReceive(mt);
+			// }
+			// MessageTemplate mt = MessageTemplate.and(MessageTemplate
+			// .MatchConversationId("msgFinDeTour"),
+			// MessageTemplate.MatchSender(observateur));
+			// ACLMessage msg = blockingReceive(mt);
+			// Informer les agents de commencer un nouveau tour
+
+			// for (AID transporteur : listeTrans) {
+			// cmd.addReceiver(transporteur);
+			// }
+			// cmd.addReceiver(observateur);
 
 		}
 
@@ -150,7 +160,7 @@ public class AgentHorloge extends Agent {
 			}
 			return false;
 		}
-		
+
 	}
-	
+
 }

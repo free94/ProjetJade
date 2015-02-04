@@ -5,15 +5,18 @@ public class Abonnement {
 //just a test
 	private int dateAbonnement;
 	private double quantiteConsommee;
+	private double quantiteConsommePrevuee;
 	private int quantiteProduite;
 	private int dateDernierePaiement;
 	
 	
-	public Abonnement(int dateAbonnement, double quantite) {
+	public Abonnement(int dateAbonnement, double quantiteConsommee) {
 		super();
 		this.dateAbonnement = dateAbonnement;
-		this.quantite = quantite;
-		this.dateAbonnement = (int) System.currentTimeMillis();
+		this.quantiteConsommee = quantiteConsommee;
+		this.quantiteConsommePrevuee = 0;
+		this.quantiteProduite = 0;
+		this.dateDernierePaiement = (int) System.currentTimeMillis();
 	}
 
 
@@ -27,8 +30,31 @@ public class Abonnement {
 	}
 
 
-	public double getQuantite() {
-		return quantite;
+	
+
+
+	public double getQuantiteConsommee() {
+		return quantiteConsommee;
+	}
+
+
+	public void setQuantiteConsommee(double quantiteConsommee) {
+		this.quantiteConsommee = quantiteConsommee;
+	}
+
+
+	public int getQuantiteProduite() {
+		return quantiteProduite;
+	}
+
+
+	public void setQuantiteProduite(int quantiteProduite) {
+		this.quantiteProduite = quantiteProduite;
+	}
+
+
+	public void setDateDernierePaiement(int dateDernierePaiement) {
+		this.dateDernierePaiement = dateDernierePaiement;
 	}
 
 
@@ -37,13 +63,15 @@ public class Abonnement {
 	}
 
 
-	public void setDateDerniereFacture(int dateDernierePaiement) {
-		this.dateDernierePaiement = dateDernierePaiement;
+
+	public double getQuantiteConsommePrevuee() {
+		return quantiteConsommePrevuee;
 	}
 
 
-	public void setQuantite(double quantite) {
-		this.quantite = quantite;
+	public void setQuantiteConsommePrevuee(double quantiteConsommePrevuee) {
+		this.quantiteConsommePrevuee = quantiteConsommePrevuee;
 	}
+
 	
 }

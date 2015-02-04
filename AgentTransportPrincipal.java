@@ -75,9 +75,9 @@ public class AgentTransportPrincipal extends Agent {
 				String title = msg.getContent();
 				ACLMessage reply = msg.createReply();
 					reply.setPerformative(ACLMessage.PROPOSE);
-					msg.setContent(prixTransport+"");
-					msg.setConversationId("reponseTarif-transporteurPrincipal");
-					myAgent.send(msg);					
+					reply.setContent(prixTransport+"");
+					reply.setConversationId("reponseTarif-transporteurPrincipal");
+					myAgent.send(reply);
 			} 
 			else {
 				block();

@@ -51,6 +51,8 @@ public class AgentTransportFournisseur extends Agent {
 		addBehaviour(new ServiceReservation());
 		addBehaviour(new ServiceFacturation());
 		addBehaviour(new ServiceObservateur());
+		addBehaviour(new ServiceReceptionPaiement());
+		
 		System.out.println("Le transporteur fournisseur: " + getAID().getName()
 				+ " est prêt.");
 	}
