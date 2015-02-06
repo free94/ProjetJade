@@ -1,3 +1,4 @@
+import java.io.IOException;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Random;
@@ -28,8 +29,8 @@ public class AgentConsommateur extends Agent {
 	// Liste des agents connus, càd les fournisseurs trouvés lors du search dans
 	// le DF
 	private AID[] fournisseurs;
-	// une liste pour enregistrer les factures
-	private ArrayList<Facture> factures = new ArrayList<Facture>();
+	//la dernière facture recue
+	private Facture facture;
 	// Agent horloge
 	private AID horloge;
 	// Random pour générer les quantité de consommation et de production
@@ -95,32 +96,10 @@ public class AgentConsommateur extends Agent {
 			// lancer le nécessaire pour trouver celui ayant le prix le plus bas
 			addBehaviour(new DemandeAbonnement(true));
 		}
-
+		addBehaviour(new ServiceTour());
 		// ajouter le traitement pour les factures recu
 		addBehaviour(new EnregFacture());
 		
-		addBehaviour(new TickerBehaviour(this, 5000) {
-			protected void onTick() {
-					// recherche des fournisseurs dans le DF
-					DFAgentDescription template = new DFAgentDescription();
-					ServiceDescription sd = new ServiceDescription();
-					sd.setType("Fournisseur");
-					template.addServices(sd);
-					try {
-						DFAgentDescription[] result = DFService.search(myAgent, template);
-						fournisseurs = new AID[result.length];
-						for (int i = 0; i < result.length; ++i) {
-							fournisseurs[i] = result[i].getName();
-						}
-					} catch (FIPAException fe) {
-						fe.printStackTrace();
-					}
-
-					//chercher à abonner en raisonnant avec les prix
-					myAgent.addBehaviour(new DemandeAbonnement(false));
-				
-			}
-		} );
 
 
 		
@@ -281,7 +260,6 @@ public class AgentConsommateur extends Agent {
 				break;
 			// Traiter la réponse d'abonnement d'un fournisseur
 			case 3:
-				// Receive the purchase order reply
 				reply = myAgent.receive(mt);
 				if (reply != null) {
 					// INFORM dans le cas où le fournisseur a accepté notre
@@ -340,16 +318,19 @@ public class AgentConsommateur extends Agent {
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
 				try {
-					Facture facture = (Facture) msg.getContentObject();
-					if (null != facture) {
+					Facture f = (Facture) msg.getContentObject();
+					if (null != f) {
 						// System.out.println(facture.toString());
-						factures.add(facture);
+						facture = f;
+						//maj prix fournisseur
+						prixVente = f.getPrixVente();
+						prixAchat = f.getPrixAchat();
 						// payer le facture par un message de retour au
 						// founrisseur
 						ACLMessage reply = msg.createReply();
 						reply.setPerformative(ACLMessage.CONFIRM);
 						reply.setConversationId("paiementFacture");
-						reply.setContent((int) facture.getMontant() + "");
+						reply.setContent((int) f.getMontant() + "");
 						myAgent.send(reply);
 					} else {
 						System.out
@@ -370,11 +351,67 @@ public class AgentConsommateur extends Agent {
 		public void action() {
 			// Transmet au fournisseur la production du tour actuel
 			// et la prévision de la consommation au tour prochain
-			// TODO
-			//Essaie de changer le fournisseur tous les 5 secondes
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchConversationId("msgDebutTour"),
+					MessageTemplate.MatchSender(horloge));
+			ACLMessage msg = myAgent.receive(mt);
+			if (msg != null) {
+				compteurTours+=1;
+				//Prévoir la consommation au prochain tour
+				consommation = rand.nextInt(10);
+				if (consommation == 0) {
+					consommation = 1;
+				}
+				//production du tour actuel
+				if (consommation < 2) {
+					capaciteProduction = 0;
+				}else {
+					capaciteProduction = rand.nextInt(consommation/2);
+				}
+				
+				//transmettre ces info au fournisseur
+				ACLMessage msg1 = new ACLMessage(ACLMessage.INFORM);
+				msg1.addReceiver(monFournisseur);
+				int[] infoConso = {consommation,capaciteProduction};
+				try {
+					msg1.setContentObject(infoConso);
+					msg1.setConversationId("infoConso");
+					myAgent.send(msg1);
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					System.err.println("Erreur génération de facture");
+				}
+				//Essaie de changer le fournisseur tous les 5 tours
+				if (compteurTours%5 == 0) {
+					// recherche des fournisseurs dans le DF
+					DFAgentDescription template = new DFAgentDescription();
+					ServiceDescription sd = new ServiceDescription();
+					sd.setType("Fournisseur");
+					template.addServices(sd);
+					try {
+						DFAgentDescription[] result = DFService.search(myAgent, template);
+						fournisseurs = new AID[result.length];
+						for (int i = 0; i < result.length; ++i) {
+							fournisseurs[i] = result[i].getName();
+						}
+					} catch (FIPAException fe) {
+						fe.printStackTrace();
+					}
 
+					//chercher à abonner en raisonnant avec les prix
+					myAgent.addBehaviour(new DemandeAbonnement(false));
+				}
+				//Enovie message fin de tour au horloge
+				ACLMessage msgFinDeTour = new ACLMessage(ACLMessage.INFORM);
+				msgFinDeTour.setConversationId("msgFinDeTourConso");
+				msgFinDeTour.addReceiver(horloge);
+				myAgent.send(msgFinDeTour);
+			} else {
+				block();
+			}
+			
 		}
-
+		
 	}
 
 }

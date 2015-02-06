@@ -20,12 +20,12 @@ import jade.lang.acl.MessageTemplate;
 public class AgentTransportPrincipal extends Agent {
 
 	// prix de transport du KWh
-	private static int prixTransport = 2;
+	private static int prixTransport = 4;
 	private static int coutTransport = 1;
 	// *-*-*-*-*-*-*-*-*-*variables*-*-*-*-*-*-*-*-*-*
 	private int CA = 0;
 	private int benefice = 0;
-
+	private int nbClient = 0;
 	protected void setup() {
 		// Enregistrement du service dans le DF
 		DFAgentDescription dfd = new DFAgentDescription();
@@ -72,7 +72,6 @@ public class AgentTransportPrincipal extends Agent {
 					MessageTemplate.MatchConversationId("demandeTarif-transporteurPrincipal"), MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
-				String title = msg.getContent();
 				ACLMessage reply = msg.createReply();
 					reply.setPerformative(ACLMessage.PROPOSE);
 					reply.setContent(prixTransport+"");
@@ -176,6 +175,7 @@ public class AgentTransportPrincipal extends Agent {
 					MessageTemplate.MatchConversationId("honorerContrat"));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
+				nbClient+=1;
 				AID abonne = msg.getSender();
 				//System.out.println(msg.getContent()+" "+msg.getSender().getLocalName());
 					int montant= Integer.parseInt(msg.getContent())*prixTransport;
@@ -228,9 +228,9 @@ public class AgentTransportPrincipal extends Agent {
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
 				ACLMessage reply = msg.createReply();
-				int dateActuelle = (int) System.currentTimeMillis();
 				InfoAgent info = new InfoAgent(getLocalName(),
-						0 + "", CA + "", benefice + "");
+						nbClient + "", CA + "", benefice + "");
+				nbClient = 0;
 				try {
 					reply.setContentObject(info);
 				} catch (IOException e) {
@@ -246,4 +246,6 @@ public class AgentTransportPrincipal extends Agent {
 		}
 
 	}
+
+	
 }

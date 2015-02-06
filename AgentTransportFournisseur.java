@@ -23,18 +23,34 @@ public class AgentTransportFournisseur extends Agent {
 	private int CA = 0;
 	private int benefice = 0;
 	//Cout de transport pour l'ensembe de sa capacité
-	private int coutTransport = 30;
+	private int coutTransport = 0;
 	private int tarif; // prix de l'utilisation de la ligne de transport pour un
 						// autre fournisseur que le créateur ! Peut être maj
-	private boolean disponible = true;// indique si le transporteur est laissé
+	private boolean disponible = false;// indique si le transporteur est laissé
 										// disponible par son créateur pour les
 										// autres fournisseurs en début de tour
 										// puis indique simplement si le
 										// transporteur peut être pris par un
 										// fournisseur ou pas
-	private int capaciteTransport = 30;
+	private static int capaciteTransport = 30;
+	//profit réalisé dans un tour 
+	private int profit = 0;
+	private int nbClient = 0;
 
 	protected void setup() {
+		//Récupére son créateur et lui informer de notre AID
+		Object[] args = getArguments();
+		createur = (AID)args[0];
+		ACLMessage informeAID = new ACLMessage(ACLMessage.INFORM);
+		informeAID.addReceiver(createur);
+		informeAID.setConversationId("aidTransporteurCree");
+		try {
+			informeAID.setContentObject(getAID());
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		send(informeAID);
 		// Enregistrement du service dans le DF
 		DFAgentDescription dfd = new DFAgentDescription();
 		dfd.setName(getAID());
@@ -47,11 +63,13 @@ public class AgentTransportFournisseur extends Agent {
 		} catch (FIPAException fe) {
 			fe.printStackTrace();
 		}
+		
 		addBehaviour(new ServiceDemandeTarif());
 		addBehaviour(new ServiceReservation());
 		addBehaviour(new ServiceFacturation());
 		addBehaviour(new ServiceObservateur());
 		addBehaviour(new ServiceReceptionPaiement());
+		addBehaviour(new ServiceinitDisponibilite());
 		
 		System.out.println("Le transporteur fournisseur: " + getAID().getName()
 				+ " est prêt.");
@@ -97,7 +115,7 @@ public class AgentTransportFournisseur extends Agent {
 		}
 	}
 
-	private class initDisponibilite extends OneShotBehaviour {
+	private class ServiceinitDisponibilite extends CyclicBehaviour {
 		@Override
 		public void action() {
 			MessageTemplate mt = MessageTemplate.and(
@@ -141,6 +159,7 @@ public class AgentTransportFournisseur extends Agent {
 				if (disponible) {
 					disponible = false;
 					abonne = msg.getSender();
+					nbClient = 1;
 					if (msg.getSender() == createur) {
 						montant = 0;
 					} else {
@@ -194,15 +213,17 @@ public class AgentTransportFournisseur extends Agent {
 			if (msg != null) {
 				// Si la demande provient du créateur et qu'on a bien que lui
 				// comme client
-				if (createur == msg.getSender() && abonne == null) {
+				if (createur == msg.getSender()) {
 					montant = 0;
 					receiver = createur;
+					nbClient = 1;
 				}
 				// Sinon c'est que la demande vient d'un abonné qui n'est pas
 				// notre créateur
 				else if (abonne == msg.getSender() && abonne != createur) {
 					montant = tarif;
 					receiver = abonne;
+					nbClient = 1;
 				} else {
 					System.out
 							.println("ERREUR : le transporteurFournisseur :"
@@ -230,22 +251,6 @@ public class AgentTransportFournisseur extends Agent {
 		}
 	}
 
-	/*
-	 * private class ServiceAbonnement extends CyclicBehaviour {
-	 * 
-	 * public void action() { MessageTemplate mt = MessageTemplate
-	 * .MatchPerformative(ACLMessage.ACCEPT_PROPOSAL); ACLMessage msg =
-	 * myAgent.receive(mt); if (msg != null) {
-	 * 
-	 * //ACLMessage reply = msg.createReply(); if(msg.getConversationId() ==
-	 * "abonnementCreateur"){ createur = msg.getSender(); abonnes.add(createur);
-	 * } //Cas rendu 3 : abonnement d'autres fournisseurs //else { //
-	 * reply.setPerformative(ACLMessage.FAILURE); //
-	 * reply.setContent("capacité insuffisante"); //} //myAgent.send(reply); }
-	 * else { block(); }
-	 * 
-	 * } }
-	 */
 
 	private class ServiceObservateur extends CyclicBehaviour {
 
@@ -257,8 +262,9 @@ public class AgentTransportFournisseur extends Agent {
 			if (msg != null) {
 				ACLMessage reply = msg.createReply();
 				int dateActuelle = (int) System.currentTimeMillis();
-				InfoAgent info = new InfoAgent(getLocalName(), 0+"", CA
+				InfoAgent info = new InfoAgent(getLocalName(), nbClient+"", CA
 						+ "", benefice + "");
+				nbClient = 0;
 				try {
 					reply.setContentObject(info);
 				} catch (IOException e) {
@@ -286,9 +292,39 @@ public class AgentTransportFournisseur extends Agent {
 			if (msg != null) {
 				CA += Integer.parseInt(msg.getContent());
 				benefice += Integer.parseInt(msg.getContent());
+				profit = Integer.parseInt(msg.getContent());
 			} else {
 				block();
 			}	
 		}
+	}
+
+	private class ServiceDemandeProfit extends CyclicBehaviour{
+
+		@Override
+		public void action() {
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchSender(createur),
+					MessageTemplate.MatchConversationId("demandeProfit"));
+			ACLMessage msg = myAgent.receive(mt);
+			if (msg != null) {
+				ACLMessage msg1 = msg.createReply();
+					if (disponible) {
+						msg1.setPerformative(ACLMessage.DISCONFIRM);
+					} else {
+						msg.setPerformative(ACLMessage.CONFIRM);
+					}
+					msg1.addReceiver(msg.getSender());
+					msg1.setConversationId("reponseProfit");
+					msg1.setContent(profit+"");
+					profit = 0;
+					myAgent.send(msg1);
+				
+			} else {
+				block();
+			}
+			
+		}
+		
 	}
 }

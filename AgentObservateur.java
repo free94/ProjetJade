@@ -1,4 +1,6 @@
+import jade.core.AID;
 import jade.core.Agent;
+import jade.core.behaviours.CyclicBehaviour;
 import jade.core.behaviours.OneShotBehaviour;
 import jade.core.behaviours.TickerBehaviour;
 import jade.domain.DFService;
@@ -32,6 +34,8 @@ public class AgentObservateur extends Agent {
 	private AgentObservateurGUI myGui;
 	//nombre de tour
 	private int nbTour = 0;
+	
+	private AID horloge;
 
 	protected void setup() {
 		//Créer la liste
@@ -41,17 +45,47 @@ public class AgentObservateur extends Agent {
 		//créer l'interface
 		myGui = new AgentObservateurGUI(this);
 		myGui.showGui();
-		
+		// Récupérer l'agent horloge
+		DFAgentDescription template = new DFAgentDescription();
+		ServiceDescription serviceDesc = new ServiceDescription();
+		serviceDesc.setType("Horloge");
+		template.addServices(serviceDesc);
+		DFAgentDescription[] result;
+		try {
+			result = DFService.search(this, template);
+			this.horloge = result[0].getName();
+		} catch (FIPAException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
 		//ajouter le comportement pour mettre à jour les info tous les 1 secondes
-		addBehaviour(new TickerBehaviour(this, 2000) {
-			protected void onTick() {
+		// inscrire l'agent au horloge
+		addBehaviour(new Inscription(horloge, "observateur"));
+		addBehaviour(new ServiceTour());
+
+	}
+	private class ServiceTour extends CyclicBehaviour{
+
+		@Override
+		public void action() {
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchConversationId("msgDebutTour"),
+					MessageTemplate.MatchSender(horloge));
+			ACLMessage msg = myAgent.receive(mt);
+			if (msg != null) {
 				addBehaviour(new MAJ("Fournisseur"));
 				addBehaviour(new MAJ("TransporteurPrincipal"));
 				addBehaviour(new MAJ("TransporteurFournisseur"));
 				addBehaviour(new Reload());
+				// Envoyer le message fin de tour
+				ACLMessage msgFinDeTour = new ACLMessage(ACLMessage.INFORM);
+				msgFinDeTour.setConversationId("msgFinDeTourFour");
+				msgFinDeTour.addReceiver(horloge);
+				myAgent.send(msgFinDeTour);
 			}
-		} );
-
+			
+		}
+		
 	}
 	
 	//Mettre à jour l'information

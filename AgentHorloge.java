@@ -101,19 +101,22 @@ public class AgentHorloge extends Agent {
 
 	private class Tour extends Behaviour {
 		private int step = 0;
-		private MessageTemplate mt = MessageTemplate
-				.MatchConversationId("msgFinDeTour");
-
+		private MessageTemplate mtFour = MessageTemplate
+				.MatchConversationId("msgFinDeTourFour");
+		private MessageTemplate mtConso = MessageTemplate
+		.MatchConversationId("msgFinDeTourConso");
+		private MessageTemplate mtObs = MessageTemplate
+		.MatchConversationId("msgFinDeTourObs");
 		@Override
 		public void action() {
 			switch (step) {
 			case 0:
-				// Reception de messages fin de tour
+				// Reception de messages fin de tour fournisseurs
 				if (listeFourReponse.size() == 0) {
-					// Tous les messages fin de tour sont recu
+					// Tous les messages fin de tour de fournisseur sont recu
 					step = 1;
 				} else {
-					ACLMessage msg = receive(mt);
+					ACLMessage msg = receive(mtFour);
 					if (msg != null) {
 						listeFourReponse.remove(msg.getSender());
 					} else {
@@ -124,38 +127,70 @@ public class AgentHorloge extends Agent {
 			case 1:
 				// Emettre les messages debut de tour
 				ACLMessage cmd = new ACLMessage(ACLMessage.INFORM);
+				if (observateur!=null) {
+					cmd.addReceiver(observateur);
+				}
 				for (AID fournisseur : listeFour) {
 					cmd.addReceiver(fournisseur);
 					listeFourReponse.add(fournisseur);
+				}
+				for (AID consommateur : listeConso) {
+					cmd.addReceiver(consommateur);
+					listeConsoReponse.add(consommateur);
 				}
 				cmd.setConversationId("msgDebutTour");
 				myAgent.send(cmd);
 				step = 2;
 				break;
+			case 2:
+				// Reception de messages fin de tour des consommateurs
+				if (listeConsoReponse.size() == 0) {
+					// Tous les messages fin de tour de consommateurs sont recu
+					step = 3;
+				} else {
+					ACLMessage msg = receive(mtConso);
+					if (msg != null) {
+						listeConsoReponse.remove(msg.getSender());
+					} else {
+						block();
+					}
+				}
+				break;
+			case 3:
+				// envoie les messages finConso aux fournisseurs
+				//pour les demander de commencer la phase de décison
+				//pour les politiques de prix
+				// Emettre les messages debut de tour
+				ACLMessage msgFinConso = new ACLMessage(ACLMessage.INFORM);
+				for (AID fournisseur : listeFour) {
+					msgFinConso.addReceiver(fournisseur);
+				}
+				msgFinConso.setConversationId("msgFinTourConso");
+				myAgent.send(msgFinConso);
+				step = 4;
+				break;
+			case 4:
+				// Reception de messages fin de tour fournisseurs
+				if (observateur!=null) {
+					ACLMessage msg = receive(mtObs);
+					if (msg != null) {
+						step = 5;
+					} else {
+						block();
+					}
+				} else {
+					step = 5;
+				}
+				break;
+			
 			}
 
-			// for (AID transporteur : listeTrans) {
-			// MessageTemplate mt = MessageTemplate.and(MessageTemplate
-			// .MatchConversationId("msgFinDeTour"),
-			// MessageTemplate.MatchSender(transporteur));
-			// ACLMessage msg = blockingReceive(mt);
-			// }
-			// MessageTemplate mt = MessageTemplate.and(MessageTemplate
-			// .MatchConversationId("msgFinDeTour"),
-			// MessageTemplate.MatchSender(observateur));
-			// ACLMessage msg = blockingReceive(mt);
-			// Informer les agents de commencer un nouveau tour
-
-			// for (AID transporteur : listeTrans) {
-			// cmd.addReceiver(transporteur);
-			// }
-			// cmd.addReceiver(observateur);
 
 		}
 
 		@Override
 		public boolean done() {
-			if (step == 2) {
+			if (step == 5) {
 				return true;
 			}
 			return false;
