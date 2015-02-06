@@ -56,7 +56,7 @@ public class AgentFournisseur extends Agent {
 																	// transporteurs
 																	// (créés)
 	//cour de création d'un transporteur interne
-	private static int coutCreationTransporteur = 1;
+	private static int coutCreationTransporteur = 600;
 
 	private int capaciteTransport = 30; // capacite de transport de son propre
 										// agent
@@ -418,9 +418,10 @@ public class AgentFournisseur extends Agent {
 						MessageTemplate.MatchConversationId("reponseProfit");
 				boolean nonUtilise = false;
 				for (AID trans : mesTransporteurs) {
+					//debug change à blockingReceive
 					ACLMessage reponse = myAgent.blockingReceive(mtProfit);
 					if (reponse!=null) {
-						int profit = Integer.parseInt(msg.getContent());
+						int profit = Integer.parseInt(reponse.getContent());
 						if (profit == 0 && (reponse.getPerformative()==ACLMessage.DISCONFIRM)) {
 							nonUtilise = true;
 						} else {
@@ -432,7 +433,6 @@ public class AgentFournisseur extends Agent {
 						}else {
 							nbToursNonUtilises=0;
 						}
-						System.out.println("debug"+profit);
 					}
 				}
 				//Baisser le prix de transport si aucun de nos
@@ -463,8 +463,9 @@ public class AgentFournisseur extends Agent {
 				
 				/* politique réservation transporteurs interne */
 				transporteursUtilises.clear();
-				resteATransporter = totalAtransporter - mesTransporteurs.size();
-				if (resteATransporter >= 0) {
+				resteATransporter = totalAtransporter - mesTransporteurs.size()*capaciteTransport;
+				//deug totalAtransporter >= 0
+				if (true) {
 					//si nos transporteurs internes ne peut pas satisfaire notre demande,
 					//on les utilise tous
 					for (AID trans : mesTransporteurs) {
@@ -886,10 +887,10 @@ public class AgentFournisseur extends Agent {
 					benefice -= amande;
 					System.out.println("Une amande de " + amande
 							+ " est payé à cause d'une livraison non assurée");
-					System.err.println(abonnements.get(abonne)
-							.getDateDernierePaiement()
-							+ "---"
-							+ abonne.getLocalName());
+//					System.err.println(abonnements.get(abonne)
+//							.getDateDernierePaiement()
+//							+ "---"
+//							+ abonne.getLocalName());
 				}
 			}
 

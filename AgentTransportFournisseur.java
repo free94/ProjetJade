@@ -70,6 +70,7 @@ public class AgentTransportFournisseur extends Agent {
 		addBehaviour(new ServiceObservateur());
 		addBehaviour(new ServiceReceptionPaiement());
 		addBehaviour(new ServiceinitDisponibilite());
+		addBehaviour(new ServiceDemandeProfit());
 		
 		System.out.println("Le transporteur fournisseur: " + getAID().getName()
 				+ " est prêt.");
@@ -220,7 +221,7 @@ public class AgentTransportFournisseur extends Agent {
 				}
 				// Sinon c'est que la demande vient d'un abonné qui n'est pas
 				// notre créateur
-				else if (abonne == msg.getSender() && abonne != createur) {
+				else if (msg.getSender()!= createur) {
 					montant = tarif;
 					receiver = abonne;
 					nbClient = 1;
@@ -312,9 +313,8 @@ public class AgentTransportFournisseur extends Agent {
 					if (disponible) {
 						msg1.setPerformative(ACLMessage.DISCONFIRM);
 					} else {
-						msg.setPerformative(ACLMessage.CONFIRM);
+						msg1.setPerformative(ACLMessage.CONFIRM);
 					}
-					msg1.addReceiver(msg.getSender());
 					msg1.setConversationId("reponseProfit");
 					msg1.setContent(profit+"");
 					profit = 0;

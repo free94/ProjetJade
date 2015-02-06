@@ -79,7 +79,7 @@ public class AgentObservateur extends Agent {
 				addBehaviour(new Reload());
 				// Envoyer le message fin de tour
 				ACLMessage msgFinDeTour = new ACLMessage(ACLMessage.INFORM);
-				msgFinDeTour.setConversationId("msgFinDeTourFour");
+				msgFinDeTour.setConversationId("msgFinDeTourObs");
 				msgFinDeTour.addReceiver(horloge);
 				myAgent.send(msgFinDeTour);
 			}

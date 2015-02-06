@@ -119,8 +119,6 @@ public class AgentHorloge extends Agent {
 					ACLMessage msg = receive(mtFour);
 					if (msg != null) {
 						listeFourReponse.remove(msg.getSender());
-					} else {
-						block();
 					}
 				}
 				break;
@@ -151,9 +149,7 @@ public class AgentHorloge extends Agent {
 					ACLMessage msg = receive(mtConso);
 					if (msg != null) {
 						listeConsoReponse.remove(msg.getSender());
-					} else {
-						block();
-					}
+					} 
 				}
 				break;
 			case 3:
@@ -175,9 +171,7 @@ public class AgentHorloge extends Agent {
 					ACLMessage msg = receive(mtObs);
 					if (msg != null) {
 						step = 5;
-					} else {
-						block();
-					}
+					} 
 				} else {
 					step = 5;
 				}
