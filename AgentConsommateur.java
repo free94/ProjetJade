@@ -29,7 +29,7 @@ public class AgentConsommateur extends Agent {
 	// Liste des agents connus, càd les fournisseurs trouvés lors du search dans
 	// le DF
 	private AID[] fournisseurs;
-	//la dernière facture recue
+	// la dernière facture recue
 	private Facture facture;
 	// Agent horloge
 	private AID horloge;
@@ -99,10 +99,7 @@ public class AgentConsommateur extends Agent {
 		addBehaviour(new ServiceTour());
 		// ajouter le traitement pour les factures recu
 		addBehaviour(new EnregFacture());
-		
 
-
-		
 		// Message de Bonjour
 		System.out.println("le consommateur " + getAID().getName()
 				+ " est prêt.");
@@ -162,7 +159,7 @@ public class AgentConsommateur extends Agent {
 		public DemandeAbonnement(boolean premier) {
 			if (premier || monFournisseur == null) {
 				// Mettre une valeur qui favorisera le changement
-				ecart = -1-prixAbonnement;
+				ecart = -1 - prixAbonnement;
 			} else {
 				ecart = prixVente - prixAchat;
 			}
@@ -214,7 +211,7 @@ public class AgentConsommateur extends Agent {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
-						
+
 					}
 					nombreReponse++;
 					if (nombreReponse >= fournisseurs.length) {
@@ -227,15 +224,15 @@ public class AgentConsommateur extends Agent {
 				break;
 			// Demander un abonnement ou non
 			case 2:
-				if ((meilleurEcart-ecart)*5<=prixAbonnement) {
-					//On ne change pas de fournisseur si l'écart cumulé dans
-					//5 tours ne dépasse pas prix d'abonnement
+				if ((meilleurEcart - ecart) * 5 <= prixAbonnement) {
+					// On ne change pas de fournisseur si l'écart cumulé dans
+					// 5 tours ne dépasse pas prix d'abonnement
 					step = 4;
 					break;
 				}
-				//On rentre dans la décision d'abonnement
-				//désabonne si on a déja un fournisseur
-				if (monFournisseur!=null) {
+				// On rentre dans la décision d'abonnement
+				// désabonne si on a déja un fournisseur
+				if (monFournisseur != null) {
 					myAgent.addBehaviour(new Desabonnement());
 				}
 				int indexFour = 0;
@@ -273,17 +270,20 @@ public class AgentConsommateur extends Agent {
 							devis = (int[]) reply.getContentObject();
 							prixVente = devis[0];
 							prixAchat = devis[1];
-							System.out.println(myAgent.getLocalName()
-									+ ">>Abonnement effectué avec le fournisseur: "
-									+ reply.getSender().getLocalName()
-									+ " pour une quantité de: " + consommation
-									+ "KW au prix de vente: " + devis[0]
-									+ " et prix d'achat: " + devis[1]);
+							System.out
+									.println(myAgent.getLocalName()
+											+ ">>Abonnement effectué avec le fournisseur: "
+											+ reply.getSender().getLocalName()
+											+ " pour une quantité de: "
+											+ consommation
+											+ "KW au prix de vente: "
+											+ devis[0] + " et prix d'achat: "
+											+ devis[1]);
 						} catch (UnreadableException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
-						
+
 					} else {
 						// Notre demande est refusé par le fournisseur
 						System.out
@@ -322,7 +322,7 @@ public class AgentConsommateur extends Agent {
 					if (null != f) {
 						// System.out.println(facture.toString());
 						facture = f;
-						//maj prix fournisseur
+						// maj prix fournisseur
 						prixVente = f.getPrixVente();
 						prixAchat = f.getPrixAchat();
 						// payer le facture par un message de retour au
@@ -356,23 +356,24 @@ public class AgentConsommateur extends Agent {
 					MessageTemplate.MatchSender(horloge));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
-				compteurTours+=1;
-				//Prévoir la consommation au prochain tour
+				compteurTours += 1;
+				// Prévoir la consommation au prochain tour
 				consommation = rand.nextInt(10);
 				if (consommation == 0) {
 					consommation = 1;
 				}
-				//production du tour actuel
+				// production du tour actuel
 				if (consommation < 2) {
 					capaciteProduction = 0;
-				}else {
-					capaciteProduction = rand.nextInt(consommation/2);
+				} else {
+					capaciteProduction = rand.nextInt(consommation / 2);
 				}
-				
-				//transmettre ces info au fournisseur
+
+				// transmettre ces info au fournisseur
 				ACLMessage msg1 = new ACLMessage(ACLMessage.INFORM);
 				msg1.addReceiver(monFournisseur);
-				int[] infoConso = {consommation,capaciteProduction};
+				// consommation = consommation prévuee au prochain tour
+				int[] infoConso = { consommation, capaciteProduction };
 				try {
 					msg1.setContentObject(infoConso);
 					msg1.setConversationId("infoConso");
@@ -381,15 +382,16 @@ public class AgentConsommateur extends Agent {
 					// TODO Auto-generated catch block
 					System.err.println("Erreur génération de facture");
 				}
-				//Essaie de changer le fournisseur tous les 5 tours
-				if (compteurTours%5 == 0) {
+				// Essaie de changer le fournisseur tous les 5 tours
+				if (compteurTours % 5 == 0) {
 					// recherche des fournisseurs dans le DF
 					DFAgentDescription template = new DFAgentDescription();
 					ServiceDescription sd = new ServiceDescription();
 					sd.setType("Fournisseur");
 					template.addServices(sd);
 					try {
-						DFAgentDescription[] result = DFService.search(myAgent, template);
+						DFAgentDescription[] result = DFService.search(myAgent,
+								template);
 						fournisseurs = new AID[result.length];
 						for (int i = 0; i < result.length; ++i) {
 							fournisseurs[i] = result[i].getName();
@@ -398,10 +400,10 @@ public class AgentConsommateur extends Agent {
 						fe.printStackTrace();
 					}
 
-					//chercher à abonner en raisonnant avec les prix
+					// chercher à abonner en raisonnant avec les prix
 					myAgent.addBehaviour(new DemandeAbonnement(false));
 				}
-				//Enovie message fin de tour au horloge
+				// Enovie message fin de tour au horloge
 				ACLMessage msgFinDeTour = new ACLMessage(ACLMessage.INFORM);
 				msgFinDeTour.setConversationId("msgFinDeTourConso");
 				msgFinDeTour.addReceiver(horloge);
@@ -409,9 +411,9 @@ public class AgentConsommateur extends Agent {
 			} else {
 				block();
 			}
-			
+
 		}
-		
+
 	}
 
 }

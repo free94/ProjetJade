@@ -3,7 +3,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Random;
 
-
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.Behaviour;
@@ -26,6 +25,7 @@ public class AgentTransportPrincipal extends Agent {
 	private int CA = 0;
 	private int benefice = 0;
 	private int nbClient = 0;
+
 	protected void setup() {
 		// Enregistrement du service dans le DF
 		DFAgentDescription dfd = new DFAgentDescription();
@@ -39,14 +39,14 @@ public class AgentTransportPrincipal extends Agent {
 		} catch (FIPAException fe) {
 			fe.printStackTrace();
 		}
-		
-		//ajouter le comportement pour traiter les demandes de prix
+
+		// ajouter le comportement pour traiter les demandes de prix
 		addBehaviour(new ServiceDemandeTarif());
-		//ajouter le comportement pour la facturation
+		// ajouter le comportement pour la facturation
 		addBehaviour(new ServiceFacturation());
-		//ajout du service pour recevoir les paiement des factures
+		// ajout du service pour recevoir les paiement des factures
 		addBehaviour(new ServiceReceptionPaiement());
-		//adoute du service pour fournir information à l'observateur
+		// adoute du service pour fournir information à l'observateur
 		addBehaviour(new ServiceObservateur());
 		System.out.println("Le transporteur principal: " + getAID().getName()
 				+ " est prêt.");
@@ -64,107 +64,25 @@ public class AgentTransportPrincipal extends Agent {
 				+ " est terminé.");
 	}
 
-	//comportement lors de la demande du tarif au kwh : plus de notion de devis
+	// comportement lors de la demande du tarif au kwh : plus de notion de devis
 	private class ServiceDemandeTarif extends CyclicBehaviour {
 		@Override
 		public void action() {
-			MessageTemplate mt = MessageTemplate.and(
-					MessageTemplate.MatchConversationId("demandeTarif-transporteurPrincipal"), MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
+			MessageTemplate mt = MessageTemplate.and(MessageTemplate
+					.MatchConversationId("demandeTarif-transporteurPrincipal"),
+					MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
 				ACLMessage reply = msg.createReply();
-					reply.setPerformative(ACLMessage.PROPOSE);
-					reply.setContent(prixTransport+"");
-					reply.setConversationId("reponseTarif-transporteurPrincipal");
-					myAgent.send(reply);
-			} 
-			else {
+				reply.setPerformative(ACLMessage.PROPOSE);
+				reply.setContent(prixTransport + "");
+				reply.setConversationId("reponseTarif-transporteurPrincipal");
+				myAgent.send(reply);
+			} else {
 				block();
 			}
 		}
 	}
-	
-	// comportement du transporteur quand il reçoit une demande d'un fournisseur
-	// (facture)
-//	private class ServiceDemandePrix extends CyclicBehaviour {
-//		public void action() {
-//			MessageTemplate mt = MessageTemplate.and(
-//					MessageTemplate.MatchConversationId("demandeDevis"), MessageTemplate.MatchPerformative(ACLMessage.REQUEST));
-//			ACLMessage msg = myAgent.receive(mt);
-//
-//			if (msg != null) {
-//				// CFP Message received. Process it
-//				String title = msg.getContent();
-//				ACLMessage reply = msg.createReply();
-//
-//				int quantiteDemandee = Integer.parseInt(msg.getContent());
-//				// creation du devis
-//				Devis d = new Devis(msg.getSender(), myAgent.getAID(), quantiteDemandee, (int) System.currentTimeMillis(), quantiteDemandee
-//						* prixTransport);
-//				try {
-//					// Le message est de type "propose" contient le devis d et a
-//					// pour conversation id "propositionDevis"
-//					reply.setPerformative(ACLMessage.PROPOSE);
-//					msg.setContentObject(d);
-//					msg.setConversationId("propositionDevis");
-//					myAgent.send(msg);
-//					// S'il n'y a pas eu de problème on ajoute ce devis à la
-//					// liste des devis émis
-//					devis.put(msg.getSender(), d);
-//				} catch (IOException e) {
-//					System.out.println("Erreur génération du devis");
-//				}
-//			} else {
-//				block();
-//			}
-//		}
-//	}
-
-//	private class ServiceAbonnement extends CyclicBehaviour {
-//
-//		public void action() {
-//			MessageTemplate mt = MessageTemplate.and(MessageTemplate
-//					.MatchPerformative(ACLMessage.REQUEST), MessageTemplate
-//					.MatchConversationId("abonnementTransporteur"));
-//			ACLMessage msg = myAgent.receive(mt);
-//			if (msg != null) {
-//				abonnes.add(msg.getSender());
-//				System.out.println("Le fournisseur "
-//						+ msg.getSender().getLocalName()
-//						+ " est abonné au transporteur principal");
-//			} else {
-//				block();
-//			}
-//
-//		}
-//	}
-
-//	private class ServiceDesabonnement extends CyclicBehaviour {
-//
-//		public void action() {
-//			MessageTemplate mt = MessageTemplate.and(MessageTemplate
-//					.MatchPerformative(ACLMessage.REQUEST), MessageTemplate
-//					.MatchConversationId("desabonnementTransporteur"));
-//			ACLMessage msg = myAgent.receive(mt);
-//			if (msg != null) {
-//				if (abonnes.contains(msg.getSender())) {
-//					abonnes.remove(msg.getSender());
-//					System.out.println("Le fournisseur "
-//							+ msg.getSender().getLocalName()
-//							+ " est désabonné au transporteur principal");
-//				} else {
-//					System.out
-//							.println("Erreur désabonnement transporteur: Le fournissuer "
-//									+ msg.getSender().getLocalName()
-//									+ " n'est pas abonné au transporteur principal");
-//				}
-//
-//			} else {
-//				block();
-//			}
-//
-//		}
-//	}
 
 	private class ServiceFacturation extends CyclicBehaviour {
 
@@ -175,24 +93,27 @@ public class AgentTransportPrincipal extends Agent {
 					MessageTemplate.MatchConversationId("honorerContrat"));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
-				nbClient+=1;
+				nbClient += 1;
 				AID abonne = msg.getSender();
-				//System.out.println(msg.getContent()+" "+msg.getSender().getLocalName());
-					int montant= Integer.parseInt(msg.getContent())*prixTransport;
-					FactureTransporteur f = new FactureTransporteur(getLocalName(), montant);
-						
-						ACLMessage msg1 = new ACLMessage(ACLMessage.INFORM);
-						try {
-							msg1.addReceiver(abonne);
-							msg1.setContentObject(f);
-							msg1.setConversationId("factureTransport");
-							myAgent.send(msg1);
-							benefice += Integer.parseInt(msg.getContent())*coutTransport;
-							CA += montant;
-						} catch (IOException e) {
-							// TODO Auto-generated catch block
-							System.out.println("Erreur génération de facture");
-						}
+				// System.out.println(msg.getContent()+" "+msg.getSender().getLocalName());
+				int montant = Integer.parseInt(msg.getContent())
+						* prixTransport;
+				FactureTransporteur f = new FactureTransporteur(getLocalName(),
+						montant);
+
+				ACLMessage msg1 = new ACLMessage(ACLMessage.INFORM);
+				try {
+					msg1.addReceiver(abonne);
+					msg1.setContentObject(f);
+					msg1.setConversationId("factureTransport");
+					myAgent.send(msg1);
+					benefice += Integer.parseInt(msg.getContent())
+							* coutTransport;
+					CA += montant;
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					System.out.println("Erreur génération de facture");
+				}
 
 			} else {
 				block();
@@ -202,20 +123,20 @@ public class AgentTransportPrincipal extends Agent {
 
 	}
 
-	private class ServiceReceptionPaiement extends CyclicBehaviour{
+	private class ServiceReceptionPaiement extends CyclicBehaviour {
 
 		@Override
 		public void action() {
-			MessageTemplate mt = MessageTemplate.and(
-					MessageTemplate.MatchPerformative(ACLMessage.CONFIRM),
-					MessageTemplate.MatchConversationId("paiementFactureTransporteur"));
+			MessageTemplate mt = MessageTemplate.and(MessageTemplate
+					.MatchPerformative(ACLMessage.CONFIRM), MessageTemplate
+					.MatchConversationId("paiementFactureTransporteur"));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
 				CA += Integer.parseInt(msg.getContent());
 				benefice += Integer.parseInt(msg.getContent());
 			} else {
 				block();
-			}	
+			}
 		}
 	}
 
@@ -228,8 +149,8 @@ public class AgentTransportPrincipal extends Agent {
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
 				ACLMessage reply = msg.createReply();
-				InfoAgent info = new InfoAgent(getLocalName(),
-						nbClient + "", CA + "", benefice + "");
+				InfoAgent info = new InfoAgent(getLocalName(), nbClient + "",
+						CA + "", benefice + "", prixTransport + "", 0 + "");
 				nbClient = 0;
 				try {
 					reply.setContentObject(info);
@@ -247,5 +168,4 @@ public class AgentTransportPrincipal extends Agent {
 
 	}
 
-	
 }

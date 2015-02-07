@@ -21,28 +21,26 @@ import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
 
-
-
 public class AgentObservateur extends Agent {
-	//Liste information fournisseur
-	private ArrayList<InfoAgent> listeInfoFour; 
-	//Information Transporteur Principal
-	private ArrayList<InfoAgent> listeInfoTransPrin; 
-	//Liste Transporteur Fournisseur
+	// Liste information fournisseur
+	private ArrayList<InfoAgent> listeInfoFour;
+	// Information Transporteur Principal
+	private ArrayList<InfoAgent> listeInfoTransPrin;
+	// Liste Transporteur Fournisseur
 	private ArrayList<InfoAgent> listeInfoTransFour;
-	//interface graphic
+	// interface graphic
 	private AgentObservateurGUI myGui;
-	//nombre de tour
+	// nombre de tour
 	private int nbTour = 0;
-	
+
 	private AID horloge;
 
 	protected void setup() {
-		//Créer la liste
+		// Créer la liste
 		listeInfoFour = new ArrayList<InfoAgent>();
 		listeInfoTransPrin = new ArrayList<InfoAgent>();
 		listeInfoTransFour = new ArrayList<InfoAgent>();
-		//créer l'interface
+		// créer l'interface
 		myGui = new AgentObservateurGUI(this);
 		myGui.showGui();
 		// Récupérer l'agent horloge
@@ -58,13 +56,15 @@ public class AgentObservateur extends Agent {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-		//ajouter le comportement pour mettre à jour les info tous les 1 secondes
+		// ajouter le comportement pour mettre à jour les info tous les 1
+		// secondes
 		// inscrire l'agent au horloge
 		addBehaviour(new Inscription(horloge, "observateur"));
 		addBehaviour(new ServiceTour());
 
 	}
-	private class ServiceTour extends CyclicBehaviour{
+
+	private class ServiceTour extends CyclicBehaviour {
 
 		@Override
 		public void action() {
@@ -83,15 +83,16 @@ public class AgentObservateur extends Agent {
 				msgFinDeTour.addReceiver(horloge);
 				myAgent.send(msgFinDeTour);
 			}
-			
+
 		}
-		
+
 	}
-	
-	//Mettre à jour l'information
-	private class MAJ extends OneShotBehaviour{
-		
+
+	// Mettre à jour l'information
+	private class MAJ extends OneShotBehaviour {
+
 		private String type;
+
 		public MAJ(String type) {
 			super();
 			this.type = type;
@@ -107,21 +108,22 @@ public class AgentObservateur extends Agent {
 			ArrayList<InfoAgent> listeInfo = null;
 			if (type.equals("Fournisseur")) {
 				listeInfo = listeInfoFour;
-			}else if (type.equals("TransporteurPrincipal")) {
+			} else if (type.equals("TransporteurPrincipal")) {
 				listeInfo = listeInfoTransPrin;
-			}else if (type.equals("TransporteurFournisseur")) {
+			} else if (type.equals("TransporteurFournisseur")) {
 				listeInfo = listeInfoTransFour;
 			}
 			try {
 				listeInfo.clear();
-				DFAgentDescription[] result = DFService.search(myAgent, template);
+				DFAgentDescription[] result = DFService.search(myAgent,
+						template);
 				ACLMessage requete = new ACLMessage(ACLMessage.REQUEST);
 				for (int i = 0; i < result.length; ++i) {
 					requete.addReceiver(result[i].getName());
 				}
 				requete.setContent("DemandeInfo");
 				requete.setConversationId("observateur");
-				requete.setReplyWith("requete" + System.currentTimeMillis()); 																	// value
+				requete.setReplyWith("requete" + System.currentTimeMillis()); // value
 				myAgent.send(requete);
 				// Preparer le template pour recevoir la réponse
 				MessageTemplate mt = MessageTemplate.and(
@@ -133,57 +135,61 @@ public class AgentObservateur extends Agent {
 						// Reply received
 						InfoAgent info;
 						try {
-							info =  (InfoAgent)reply.getContentObject();
+							info = (InfoAgent) reply.getContentObject();
 							listeInfo.add(info);
 						} catch (UnreadableException e) {
 							// TODO Auto-generated catch block
 							e.printStackTrace();
 						}
-					}else{
-						System.out.println("Erreur Observateur: info null recu");
+					} else {
+						System.out
+								.println("Erreur Observateur: info null recu");
 					}
 				}
 			} catch (FIPAException fe) {
 				fe.printStackTrace();
 			}
-			
+
 		}
-		
+
 	}
-	
-	//Actualiser affichage
-	private class Reload extends OneShotBehaviour{
+
+	// Actualiser affichage
+	private class Reload extends OneShotBehaviour {
 
 		@Override
 		public void action() {
 			nbTour++;
-			Object[][] dataFour = new Object[listeInfoFour.size()][4];
+			Object[][] dataFour = new Object[listeInfoFour.size()][6];
 			for (int i = 0; i < dataFour.length; i++) {
 				dataFour[i][0] = listeInfoFour.get(i).nom;
 				dataFour[i][1] = listeInfoFour.get(i).nbClient;
 				dataFour[i][2] = listeInfoFour.get(i).CA;
 				dataFour[i][3] = listeInfoFour.get(i).benefice;
+				dataFour[i][4] = listeInfoFour.get(i).prixVenteOuTransport;
+				dataFour[i][5] = listeInfoFour.get(i).prixAchatOuCapaTrans;
 			}
-			Object[][] dataTransPrin = new Object[listeInfoTransPrin.size()][4];
+			Object[][] dataTransPrin = new Object[listeInfoTransPrin.size()][6];
 			for (int i = 0; i < dataTransPrin.length; i++) {
 				dataTransPrin[i][0] = listeInfoTransPrin.get(i).nom;
 				dataTransPrin[i][1] = listeInfoTransPrin.get(i).nbClient;
 				dataTransPrin[i][2] = listeInfoTransPrin.get(i).CA;
 				dataTransPrin[i][3] = listeInfoTransPrin.get(i).benefice;
+				dataTransPrin[i][4] = listeInfoTransPrin.get(i).prixVenteOuTransport;
 			}
-			Object[][] dataTransFour = new Object[listeInfoTransFour.size()][4];
+			Object[][] dataTransFour = new Object[listeInfoTransFour.size()][6];
 			for (int i = 0; i < dataTransFour.length; i++) {
 				dataTransFour[i][0] = listeInfoTransFour.get(i).nom;
 				dataTransFour[i][1] = listeInfoTransFour.get(i).nbClient;
 				dataTransFour[i][2] = listeInfoTransFour.get(i).CA;
 				dataTransFour[i][3] = listeInfoTransFour.get(i).benefice;
+				dataTransFour[i][4] = listeInfoTransFour.get(i).prixVenteOuTransport;
+				dataTransFour[i][5] = listeInfoTransFour.get(i).prixAchatOuCapaTrans;
 			}
-			myGui.reload(dataFour,dataTransPrin,dataTransFour,nbTour);
-			
+			myGui.reload(dataFour, dataTransPrin, dataTransFour, nbTour);
+
 		}
-		
+
 	}
 
-	
-	
 }

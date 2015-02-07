@@ -22,22 +22,12 @@ import jade.wrapper.AgentController;
 import jade.wrapper.StaleProxyException;
 
 public class AgentFournisseur extends Agent {
-	/**
-	 * Agent fournisseur
-	 * 
-	 * -1h dans le programme = 1s dans la vie réel -Les dates sont réprésentés
-	 * en unité de milliseconde
-	 */
-	// //les constantes pour observateurs
-	// private final static int obListeAbonnes = 0;
-	// private final static int obCA = 1;
-	// private final static int obBenefice = 2;
+
 	// la capacité utilisé actuellement
 	private int capaciteUtilisee = 0;
 	// l'agent horloge
 	private AID horloge = null;
-	// *****************************************LES DONNEES
-	// TRANSPORTEURS*****************************************
+	// **************************LES DONNEESTRANSPORTEURS****************
 	// transporteur tierce potentiellement utilisé
 	private AID transporteurPrincipal = null;
 
@@ -45,44 +35,31 @@ public class AgentFournisseur extends Agent {
 
 	// transporteurs interne réservés sur le tour courant
 	private ArrayList<AID> transporteursUtilises = new ArrayList<AID>();
-	private ArrayList<Devis> transporteursDisponibles = new ArrayList<Devis>();// transporteurs
-																				// disponibles
-																				// au
-																				// début
-																				// du
-																				// tour
-
-	private ArrayList<AID> mesTransporteurs = new ArrayList<AID>();// AID de mes
-																	// transporteurs
-																	// (créés)
-	//cour de création d'un transporteur interne
+	// transporteurs disponibles au début du tour
+	private ArrayList<Devis> transporteursDisponibles = new ArrayList<Devis>();
+	// AID de mes transporteurs (créés)
+	private ArrayList<AID> mesTransporteurs = new ArrayList<AID>();
+	// cour de création d'un transporteur interne
 	private static int coutCreationTransporteur = 600;
+	// capacite de transport de son propre agent
+	private int capaciteTransport = 30; 
 
-	private int capaciteTransport = 30; // capacite de transport de son propre
-										// agent
-
-	private int tarifTransporteur = 70; // tarif de la location d'une ligne de
-										// transport créée par le fournisseur
-
-	// *****************************************LES DONNEES
-	// "COMPTABLES"*****************************************
+	// tarif de la location d'une ligne de transport créée par le fournisseur
+	private int tarifTransporteur = 70; 
+	// ********LES DONNEES "COMPTABLES"************
 	private int CA;
 
 	private int benefice;
 
-	private static final int amande = 100;// montant d'amande pour une livraison
-											// non assurée
-
-	private int nombrePeriodeRentabiliserCreation = 5;// nombre de périodes
-														// estimées pour rendre
-														// rentable la création
-														// d'un transporteur
-														// perso
-	
+	// montant d'amande pour une livraison non assurée
+	private static final int amande = 100;
+	// nombre de périodes estimées pour rendre rentable la création d'un transporteur perso
+	private int nombrePeriodeRentabiliserCreation = 5;
 	private static int coutProduction = 1;
 	// prix de vente de l'electricié aux clients
 	private int prixVente = 10;
 	private int prixVenteMin = 4;
+	private int prixVenteMax = 20;
 	// prix d'achat de l'electricié depuis clients
 	private int prixAchat = 2;
 	private int prixAchatMax = 4;
@@ -99,15 +76,15 @@ public class AgentFournisseur extends Agent {
 																					// consommateurs
 
 	private ArrayList<FactureTransporteur> facturesTransport = new ArrayList<FactureTransporteur>();
-	//numérotation pour les transporteurs internes crés
+	// numérotation pour les transporteurs internes crés
 	private int numTransIntern;
-	//nombre de tours consécurtifs où un transporteurs interne 
-	//disponible à servir aux autres n'est pas utilisé
+	// nombre de tours consécurtifs où un transporteurs interne
+	// disponible à servir aux autres n'est pas utilisé
 	private int nbToursNonUtilises = 0;
-	//Limite de fois pour décide à baisser le prix de transporteur
+	// Limite de fois pour décide à baisser le prix de transporteur
 	private int nbToursNonUtilisesLimite = 3;
-	// -----------------------------------------------------------------------------------------------------------
 
+	
 	protected void setup() {
 		// Enregistrement du service dans le DF
 		DFAgentDescription dfd = new DFAgentDescription();
@@ -158,7 +135,7 @@ public class AgentFournisseur extends Agent {
 		// ajouter le comportement principal qui livre electricité et facture
 		// les clients
 		addBehaviour(new ServiceTour());
-		addBehaviour(new PolitiqueDecisoin());
+		addBehaviour(new ServicePolitiqueDecisoin());
 		// ajouter le service pour traiter les demandes de prix
 		addBehaviour(new ServiceDemandePrix());
 		// ajouter le service pour traiter les demandes d'abonnement
@@ -172,6 +149,7 @@ public class AgentFournisseur extends Agent {
 		// ajout du service pour recevoir les paiement des factures
 		addBehaviour(new ServiceReceptionPaiement());
 		addBehaviour(new ServiceRecuperationAIDTrans());
+		addBehaviour(new ServiceChangerAbonnement());
 		// ajouter la vérification des délais de paiement pour les factures tous
 		// les 10 secondes
 		addBehaviour(new TickerBehaviour(this, 10000) {
@@ -283,7 +261,7 @@ public class AgentFournisseur extends Agent {
 				reply.setPerformative(ACLMessage.INFORM);
 				abonnements.put(msg.getSender(),
 						new Abonnement((int) System.currentTimeMillis(),
-								Integer.parseInt(msg.getContent())));
+								consommation, consommation));
 				capaciteUtilisee += consommation;
 				int[] devis = { prixVente, prixAchat };
 				try {
@@ -311,10 +289,7 @@ public class AgentFournisseur extends Agent {
 					MessageTemplate.MatchConversationId("desabonnement"));
 			ACLMessage msg = myAgent.receive(mt);
 			if (msg != null) {
-				capaciteUtilisee -= abonnements.get(msg.getSender())
-						.getQuantiteConsommee();
 				abonnements.remove(msg.getSender());
-
 			} else {
 				block();
 			}
@@ -334,7 +309,8 @@ public class AgentFournisseur extends Agent {
 				ACLMessage reply = msg.createReply();
 				int dateActuelle = (int) System.currentTimeMillis();
 				InfoAgent info = new InfoAgent(getLocalName(),
-						abonnements.size() + "", CA + "", benefice + "");
+						abonnements.size() + "", CA + "", benefice + "",
+						prixVente + "", prixAchat + "");
 				try {
 					reply.setContentObject(info);
 				} catch (IOException e) {
@@ -357,7 +333,7 @@ public class AgentFournisseur extends Agent {
 	// transporteur & plannification de transport)
 	// consiste uniquement en une phase de décisions pour le prochain tour,
 	// impliquant nos propres transporteurs.
-	private class PolitiqueDecisoin extends CyclicBehaviour{
+	private class ServicePolitiqueDecisoin extends CyclicBehaviour {
 		@Override
 		public void action() {
 			MessageTemplate mt = MessageTemplate.and(
@@ -372,124 +348,149 @@ public class AgentFournisseur extends Agent {
 				// probablement à transporter étant donné les derniers chiffres
 				// des clients
 				for (Abonnement a : abonnements.values()) {
-					totalAtransporter += a.getQuantiteConsommee();
+					totalAtransporter += a.getQuantiteConsommeePrevuee();
+					a.setQuantiteConsommee(a.getQuantiteConsommeePrevuee());
 				}
-				//maj pour le prochain tour
+				// maj pour le prochain tour
 				capaciteUtilisee = totalAtransporter;
 				// deuxième étape: calculer la quantité reste à transporter
-				//et la comparé avec le prix du transport du marché pour décider
-				//Récupérer le meilleur prix de transport
+				// et la comparé avec le prix du transport du marché pour
+				// décider
+				// Récupérer le meilleur prix de transport
 				int prixMoyen = 0;
 				for (Devis devis : transporteursDisponibles) {
-					prixMoyen+=devis.getMontant();
+					prixMoyen += devis.getMontant();
 				}
-				//ajouter le prix du transporteur principal pour une meilleur comparaison
-				prixMoyen+=tarifTransporteurPrincipal;
-				prixMoyen = prixMoyen/(transporteursDisponibles.size()+1);
-				//Quantité qui ne peut pas être satisfait par nos transporteur interne
-				int resteATransporter = totalAtransporter - capaciteTransport*mesTransporteurs.size();
-				//retour d'investissement de la création d'un transporteur interne
-				int retour = resteATransporter*prixMoyen*nombrePeriodeRentabiliserCreation;
+				// ajouter le prix du transporteur principal pour une meilleur
+				// comparaison
+				prixMoyen += tarifTransporteurPrincipal;
+				prixMoyen = prixMoyen / (transporteursDisponibles.size() + 1);
+				// Quantité qui ne peut pas être satisfait par nos transporteur
+				// interne
+				int resteATransporter = totalAtransporter - capaciteTransport
+						* mesTransporteurs.size();
+				// retour d'investissement de la création d'un transporteur
+				// interne
+				int retour = resteATransporter * prixMoyen
+						* nombrePeriodeRentabiliserCreation;
 				if (retour > coutCreationTransporteur) {
-					//on créer un transporteur interne
+					// on créer un transporteur interne
 					AgentController trans;
 					try {
-						AID[] aid ={getAID()}; 
-						trans = getContainerController().createNewAgent("transporteur"+getLocalName()+"-"+numTransIntern, AgentTransportFournisseur.class.getName(), aid);
+						AID[] aid = { getAID() };
+						trans = getContainerController().createNewAgent(
+								"transporteur" + getLocalName() + "-"
+										+ numTransIntern,
+								AgentTransportFournisseur.class.getName(), aid);
 						trans.start();
-						numTransIntern+=1;
+						numTransIntern += 1;
 					} catch (StaleProxyException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
-					
-					
+
 				}
 				/* politique prix */
-				//prix transport
-				//Cumuler les profits des transporterus interne dispo
+				// prix transport
+				// Cumuler les profits des transporterus interne dispo
 				ACLMessage rqst = new ACLMessage(ACLMessage.REQUEST);
 				rqst.setConversationId("demandeProfit");
 				for (AID trans : mesTransporteurs) {
 					rqst.addReceiver(trans);
 				}
 				myAgent.send(rqst);
-				MessageTemplate mtProfit = 
-						MessageTemplate.MatchConversationId("reponseProfit");
+				MessageTemplate mtProfit = MessageTemplate
+						.MatchConversationId("reponseProfit");
 				boolean nonUtilise = false;
 				for (AID trans : mesTransporteurs) {
-					//debug change à blockingReceive
+					// debug change à blockingReceive
 					ACLMessage reponse = myAgent.blockingReceive(mtProfit);
-					if (reponse!=null) {
+					if (reponse != null) {
 						int profit = Integer.parseInt(reponse.getContent());
-						if (profit == 0 && (reponse.getPerformative()==ACLMessage.DISCONFIRM)) {
+						if (profit == 0
+								&& (reponse.getPerformative() == ACLMessage.DISCONFIRM)) {
 							nonUtilise = true;
 						} else {
 							CA += profit;
 							benefice += profit;
 						}
 						if (nonUtilise) {
-							nbToursNonUtilises+=1;
-						}else {
-							nbToursNonUtilises=0;
+							nbToursNonUtilises += 1;
+						} else {
+							nbToursNonUtilises = 0;
 						}
 					}
 				}
-				//Baisser le prix de transport si aucun de nos
-				//transporteur n'est utilisé par autre fournisseur 
-				//pendant 3 tours
+				// Baisser le prix de transport si aucun de nos
+				// transporteur n'est utilisé par autre fournisseur
+				// pendant 3 tours
 				if (nbToursNonUtilises > nbToursNonUtilisesLimite) {
-					//ce tarif ne peut pas au dessous de 10
-					tarifTransporteur = (tarifTransporteur>10)?tarifTransporteur-5:tarifTransporteur;
+					// ce tarif ne peut pas au dessous de 10
+					tarifTransporteur = (tarifTransporteur > 10) ? tarifTransporteur - 5
+							: tarifTransporteur;
+					// informer nos transporteurs
+					ACLMessage msgMAJ = new ACLMessage(ACLMessage.INFORM);
+					msgMAJ.setContent(tarifTransporteur + "");
+					msgMAJ.setConversationId("MAJPrixTransport");
+					for (AID trans : mesTransporteurs) {
+						msgMAJ.addReceiver(trans);
+					}
+					myAgent.send(msgMAJ);
 					nbToursNonUtilises = 0;
 				}
-				
-				//prix énergie (vente,achat)
-				if (((benefice+0.0)/CA)<0.5) {
-					//On baisse nos prix si notre taux de bénéfice < 50%
-					if (prixVente>prixVenteMin) {
-						prixVente-=1;
-					} else if(prixAchat<prixAchatMax){
-						prixAchat+=1;
+
+				// prix énergie (vente,achat)
+				if (((benefice + 0.0) / CA) < 0.5) {
+					// On baisse nos prix si notre taux de bénéfice < 50%
+					if (prixVente > prixVenteMin) {
+						prixVente -= 1;
+					} else if (prixAchat < prixAchatMax) {
+						prixAchat += 1;
 					}
-				}else {
-					//On prévilige 2 comme prix d'achat d'énergie
-					if (prixAchat>2) {
-						prixAchat-=1;
+				} else {
+					// On prévilige 2 comme prix d'achat d'énergie
+					if (prixAchat > 2) {
+						prixAchat -= 1;
 					}
-					prixVente+=1;
+					if (prixVente < prixVenteMax) {
+						prixVente += 1;
+					}
 				}
-				
-				
+
 				/* politique réservation transporteurs interne */
 				transporteursUtilises.clear();
-				resteATransporter = totalAtransporter - mesTransporteurs.size()*capaciteTransport;
-				//deug totalAtransporter >= 0
-				if (true) {
-					//si nos transporteurs internes ne peut pas satisfaire notre demande,
-					//on les utilise tous
+				resteATransporter = totalAtransporter - mesTransporteurs.size()
+						* capaciteTransport;
+				if (totalAtransporter >= 0) {
+					// si nos transporteurs internes ne peut pas satisfaire
+					// notre demande,
+					// on les utilise tous
 					for (AID trans : mesTransporteurs) {
 						transporteursUtilises.add(trans);
 					}
-					
+
 				} else {
-					//si nous disposont d'exédent de capatité de transport
-					//calculer le nombre de transporteurs internes dispo
-					int nbDispo = (int) Math.floor(Math.abs(resteATransporter)/(capaciteTransport+0.0));
-					//Si la division n'est pas entière,
-					//nous avons un transporteur dont la capacité n'est pas totalement utilisé
-					boolean reste1 = (resteATransporter%capaciteTransport == 0);
-					//si oui ,décider
+					// si nous disposont d'exédent de capatité de transport
+					// calculer le nombre de transporteurs internes dispo
+					int nbDispo = (int) Math.floor(Math.abs(resteATransporter)
+							/ (capaciteTransport + 0.0));
+					// Si la division n'est pas entière,
+					// nous avons un transporteur dont la capacité n'est pas
+					// totalement utilisé
+					boolean reste1 = (resteATransporter % capaciteTransport == 0);
+					// si oui ,décider
 					if (reste1) {
-						//On rend ce transporteur dispo s'il est plus
-						//profitable d'utilise le transporteur principal
-						if (tarifTransporteur>tarifTransporteurPrincipal*(capaciteTransport+resteATransporter/capaciteTransport)) 
-							nbDispo+=1;
+						// On rend ce transporteur dispo s'il est plus
+						// profitable d'utilise le transporteur principal
+						if (tarifTransporteur > tarifTransporteurPrincipal
+								* (capaciteTransport + resteATransporter
+										/ capaciteTransport))
+							nbDispo += 1;
 					}
 					for (AID trans : mesTransporteurs) {
-						if (nbDispo>0) {
+						if (nbDispo > 0) {
 							initDisponibilite(true, trans);
-							nbDispo-=1;
+							nbDispo -= 1;
 						} else {
 							transporteursUtilises.add(trans);
 							initDisponibilite(false, trans);
@@ -535,7 +536,7 @@ public class AgentFournisseur extends Agent {
 		// Utiliser pour le swith
 		int step = 0;
 		// Compter le nombre de réponses recus pour les demandes de devis
-		int nombreReponse = 0;                            
+		int nombreReponse = 0;
 		// liste de tous les transporteurs four
 		ArrayList<AID> tousLesTransporteursFour;
 		// template pour la receptoin de message
@@ -611,7 +612,7 @@ public class AgentFournisseur extends Agent {
 						}
 					}
 					nombreReponse++;
-					
+
 				} else {
 					block();
 				}
@@ -773,7 +774,8 @@ public class AgentFournisseur extends Agent {
 									/ 1000;
 							f = new Facture(getLocalName(), abonnements.get(a)
 									.getDateAbonnement(), abonnements.get(a)
-									.getDateAbonnement(), dateActuelle, vente,prixVente,prixAchat);
+									.getDateAbonnement(), dateActuelle, vente,
+									prixVente, prixAchat);
 							// Le cout de production réduit la bénéfice
 							benefice -= quantite * coutProduction
 									* periodeConsommation / 1000;
@@ -783,7 +785,8 @@ public class AgentFournisseur extends Agent {
 									/ 1000;
 							f = new Facture(getLocalName(), abonnements.get(a)
 									.getDateAbonnement(), dateActuelle
-									- periodeFacturation, dateActuelle, vente,prixVente,prixAchat);
+									- periodeFacturation, dateActuelle, vente,
+									prixVente, prixAchat);
 							// Le cout de production réduit la bénéfice
 							benefice -= quantite * coutProduction
 									* periodeFacturation / 1000;
@@ -802,9 +805,7 @@ public class AgentFournisseur extends Agent {
 
 					}
 				}
-				//décision pour les politiques
-				addBehaviour(new PolitiqueDecisoin());
-				
+
 			} else {
 				block();
 			}
@@ -865,17 +866,15 @@ public class AgentFournisseur extends Agent {
 				benefice += Integer.parseInt(msg.getContent());
 				// System.out.println("Client:"+msg.getContent());
 				// mettre à jour la date de dernier paiement
-				if (abonnements.get(msg.getSender()) == null)
-					System.err
-							.println("SENDER INTROUVABLE DANS LA LISTE DES ABONNES");
-				abonnements.get(msg.getSender()).setDateDernierePaiement(
-						(int) System.currentTimeMillis());
+				if (abonnements.get(msg.getSender()) != null)
+					abonnements.get(msg.getSender()).setDateDernierePaiement(
+							(int) System.currentTimeMillis());
 			} else {
 				block();
 			}
 		}
 	}
-	
+
 	// vérifier les délais de paiement pour les factures
 	private class VerifPaiement extends OneShotBehaviour {
 
@@ -887,18 +886,18 @@ public class AgentFournisseur extends Agent {
 					benefice -= amande;
 					System.out.println("Une amande de " + amande
 							+ " est payé à cause d'une livraison non assurée");
-//					System.err.println(abonnements.get(abonne)
-//							.getDateDernierePaiement()
-//							+ "---"
-//							+ abonne.getLocalName());
+					// System.err.println(abonnements.get(abonne)
+					// .getDateDernierePaiement()
+					// + "---"
+					// + abonne.getLocalName());
 				}
 			}
 
 		}
 
 	}
-	
-	//Pour récupérer l'AID d'un transporteur crée par ce fournisseur
+
+	// Pour récupérer l'AID d'un transporteur crée par ce fournisseur
 	private class ServiceRecuperationAIDTrans extends CyclicBehaviour {
 
 		@Override
@@ -915,11 +914,42 @@ public class AgentFournisseur extends Agent {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-				
+
 			} else {
 				block();
 			}
 		}
 	}
 
+	private class ServiceChangerAbonnement extends CyclicBehaviour {
+
+		@Override
+		public void action() {
+			MessageTemplate mt = MessageTemplate.and(
+					MessageTemplate.MatchPerformative(ACLMessage.INFORM),
+					MessageTemplate.MatchConversationId("infoConso"));
+			ACLMessage msg = myAgent.receive(mt);
+			if (msg != null) {
+
+				try {
+					int[] infoConso = (int[]) msg.getContentObject();
+					if (abonnements.keySet().contains(msg.getSender())) {
+						Abonnement aConsommateur = abonnements.get(msg
+								.getSender());
+						aConsommateur.setQuantiteConsommeePrevuee(infoConso[0]);
+						aConsommateur.setQuantiteProduite(infoConso[1]);
+						// diminuer la bénéfice et le CA pour la quantité
+						// d'électricité rachetée
+						CA -= infoConso[1] * prixAchat;
+						benefice -= infoConso[1] * prixAchat;
+					}
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+			} else {
+				block();
+			}
+		}
+
+	}
 }

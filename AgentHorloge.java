@@ -104,9 +104,10 @@ public class AgentHorloge extends Agent {
 		private MessageTemplate mtFour = MessageTemplate
 				.MatchConversationId("msgFinDeTourFour");
 		private MessageTemplate mtConso = MessageTemplate
-		.MatchConversationId("msgFinDeTourConso");
+				.MatchConversationId("msgFinDeTourConso");
 		private MessageTemplate mtObs = MessageTemplate
-		.MatchConversationId("msgFinDeTourObs");
+				.MatchConversationId("msgFinDeTourObs");
+
 		@Override
 		public void action() {
 			switch (step) {
@@ -125,7 +126,7 @@ public class AgentHorloge extends Agent {
 			case 1:
 				// Emettre les messages debut de tour
 				ACLMessage cmd = new ACLMessage(ACLMessage.INFORM);
-				if (observateur!=null) {
+				if (observateur != null) {
 					cmd.addReceiver(observateur);
 				}
 				for (AID fournisseur : listeFour) {
@@ -149,13 +150,13 @@ public class AgentHorloge extends Agent {
 					ACLMessage msg = receive(mtConso);
 					if (msg != null) {
 						listeConsoReponse.remove(msg.getSender());
-					} 
+					}
 				}
 				break;
 			case 3:
 				// envoie les messages finConso aux fournisseurs
-				//pour les demander de commencer la phase de décison
-				//pour les politiques de prix
+				// pour les demander de commencer la phase de décison
+				// pour les politiques de prix
 				// Emettre les messages debut de tour
 				ACLMessage msgFinConso = new ACLMessage(ACLMessage.INFORM);
 				for (AID fournisseur : listeFour) {
@@ -167,18 +168,17 @@ public class AgentHorloge extends Agent {
 				break;
 			case 4:
 				// Reception de messages fin de tour fournisseurs
-				if (observateur!=null) {
+				if (observateur != null) {
 					ACLMessage msg = receive(mtObs);
 					if (msg != null) {
 						step = 5;
-					} 
+					}
 				} else {
 					step = 5;
 				}
 				break;
-			
-			}
 
+			}
 
 		}
 

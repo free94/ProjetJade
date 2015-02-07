@@ -28,13 +28,14 @@ public class AgentObservateurGUI extends JFrame {
 	private AgentObservateur myAgent;
 	// Liste d'information fournisseur
 	private String[] columnNamesFour = { "Nom fournisseur", "Nombre Clients",
-			"CA", "Bénéfice" };
+			"CA", "Bénéfice", "prixVente(unitaire)", "prixAchat(unitaire)" };
 	// Liste d'information transporteur principal
 	private String[] columnNamesTransPrin = { "Transporteur Principal",
-			"Nombre Clients", "CA", "Bénéfice" };
+			"Nombre Clients", "CA", "Bénéfice", "prixTransport(unitaire)" };
 	// Liste d'information fournisseur
 	private String[] columnNamesTransFour = { "Transporteur Fournisseur",
-			"Nombre Clients", "CA", "Bénéfice" };
+			"Nombre Clients", "CA", "Bénéfice", "prixTransport(par tranche)",
+			"capacitéTransport" };
 
 	/**
 	 * This is the default constructor
@@ -111,8 +112,9 @@ public class AgentObservateurGUI extends JFrame {
 		return jTableTransFour;
 	}
 
-	public void reload(Object[][] dataFour, Object[][] dataTransPrin,Object[][] dataTransFour,int nbTour) {
-		
+	public void reload(Object[][] dataFour, Object[][] dataTransPrin,
+			Object[][] dataTransFour, int nbTour) {
+
 		DefaultTableModel tableModelFour = (DefaultTableModel) jTableFour
 				.getModel();
 		tableModelFour.setRowCount(0);
@@ -122,9 +124,10 @@ public class AgentObservateurGUI extends JFrame {
 		DefaultTableModel tableModelTransFour = (DefaultTableModel) jTableTransFour
 				.getModel();
 		tableModelTransFour.setRowCount(0);
-		// Comparateur pour trier la talbe par le nom de pour avoir une affichage
+		// Comparateur pour trier la talbe par le nom de pour avoir une
+		// affichage
 		// "stable"
-		Comparator<Object[]> comp  = new Comparator<Object[]>() {
+		Comparator<Object[]> comp = new Comparator<Object[]>() {
 			public int compare(final Object[] entry1, final Object[] entry2) {
 				final String time1 = entry1[0].toString();
 				final String time2 = entry2[0].toString();
@@ -137,23 +140,22 @@ public class AgentObservateurGUI extends JFrame {
 		}
 		jTableFour.setModel(tableModelFour);
 		jTableFour.repaint();
-		
+
 		Arrays.sort(dataTransPrin, comp);
 		for (int j = 0; j < dataTransPrin.length; j++) {
 			tableModelTransPrin.addRow(dataTransPrin[j]);
 		}
 		jTableTransPrin.setModel(tableModelTransPrin);
 		jTableTransPrin.repaint();
-		
+
 		Arrays.sort(dataTransFour, comp);
 		for (int j = 0; j < dataTransFour.length; j++) {
 			tableModelTransFour.addRow(dataTransFour[j]);
 		}
 		jTableTransFour.setModel(tableModelTransFour);
-		this.setTitle("nombre de tour: "+nbTour);
+		this.setTitle("nombre de tour: " + nbTour);
 		jTableTransFour.repaint();
 
-		
 	}
 
 	public void showGui() {
