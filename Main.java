@@ -41,14 +41,15 @@ public class Main {
 				AgentTransportPrincipal.class.getName(), null);
 		transPrincipal.start();
 		// Fournisseurs
+		String[] strategiePrix = {"2"};
 		AgentController fournisseur1 = mc.createNewAgent("fournisseur1",
-				AgentFournisseur.class.getName(), null);
+				AgentFournisseur.class.getName(), strategiePrix);
 		fournisseur1.start();
 		AgentController fournisseur2 = mc.createNewAgent("fournisseur2",
-				AgentFournisseur.class.getName(), null);
+				AgentFournisseur.class.getName(), strategiePrix);
 		fournisseur2.start();
 		AgentController fournisseur3 = mc.createNewAgent("fournisseur3",
-				AgentFournisseur.class.getName(), null);
+				AgentFournisseur.class.getName(), strategiePrix);
 		fournisseur3.start();
 		AgentController observateur = mc.createNewAgent("observateur",
 				AgentObservateur.class.getName(), null);

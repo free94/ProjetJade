@@ -79,13 +79,27 @@ public class AgentFournisseur extends Agent {
 	// numérotation pour les transporteurs internes crés
 	private int numTransIntern;
 	// nombre de tours consécurtifs où un transporteurs interne
+	private int strategiePrix = 0;
+	/** Varibles utilisables pour la 1ere stratégie de prix vente/achat **/
 	// disponible à servir aux autres n'est pas utilisé
 	private int nbToursNonUtilises = 0;
 	// Limite de fois pour décide à baisser le prix de transporteur
 	private int nbToursNonUtilisesLimite = 3;
-
-	
+	/** Varibles utilisables pour la 2eme stratégie de prix vente/achat **/
+	// nombre de clients au cinq tour précédente.
+	private int nbClientsHistorique = 0;
+	//Compteur nombre de tours
+	private int nbTours = 0;
 	protected void setup() {
+		Object[] args = getArguments();
+		if (args != null && args.length > 0) {
+			this.strategiePrix = Integer.parseInt(args[0].toString());
+		} else {
+			// Terminer l'agent si les arguments sont incorrect
+			System.out
+					.println("Il manque d'argument [int strategiePrix] pour l'instanciation de l'agentConsommateur");
+			doDelete();
+		}
 		// Enregistrement du service dans le DF
 		DFAgentDescription dfd = new DFAgentDescription();
 		dfd.setName(getAID());
@@ -440,20 +454,43 @@ public class AgentFournisseur extends Agent {
 				}
 
 				// prix énergie (vente,achat)
-				if (((benefice + 0.0) / CA) < 0.5) {
-					// On baisse nos prix si notre taux de bénéfice < 50%
-					if (prixVente > prixVenteMin) {
-						prixVente -= 1;
-					} else if (prixAchat < prixAchatMax) {
-						prixAchat += 1;
+				if (strategiePrix == 1) {
+					if (((double)benefice / (double)CA) < 0.5) {
+						// On baisse nos prix si notre taux de bénéfice < 50% CA
+						if (prixVente > prixVenteMin) {
+							prixVente -= 1;
+						} else if (prixAchat < prixAchatMax) {
+							prixAchat += 1;
+						}
+					} else {
+						// On prévilige 2 comme prix d'achat d'énergie
+						if (prixAchat > 2) {
+							prixAchat -= 1;
+						}
+						if (prixVente < prixVenteMax) {
+							prixVente += 1;
+						}
 					}
-				} else {
-					// On prévilige 2 comme prix d'achat d'énergie
-					if (prixAchat > 2) {
-						prixAchat -= 1;
-					}
-					if (prixVente < prixVenteMax) {
-						prixVente += 1;
+				}else if (strategiePrix == 2) {
+					nbTours++;
+					if (nbTours%5 == 0) {
+						if (abonnements.size()< nbClientsHistorique) {
+							// On baisse nos prix si notre nombre de clients a diminué
+							if (prixVente > prixVenteMin) {
+								prixVente -= 1;
+							} else if (prixAchat < prixAchatMax) {
+								prixAchat += 1;
+							}
+						} else {
+							// On prévilige 2 comme prix d'achat d'énergie
+							if (prixAchat > 2) {
+								prixAchat -= 1;
+							}
+							if (prixVente < prixVenteMax) {
+								prixVente += 1;
+							}
+						}
+						nbClientsHistorique = abonnements.size();
 					}
 				}
 
